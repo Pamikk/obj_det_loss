@@ -8,14 +8,12 @@ from tqdm import tqdm
 import os
 import json
 
-from loss_funcs import *
 from utils import Logger,cal_metrics
 from utils import non_maximum_supression_soft as non_maximum_supression
 tosave=['mAP']
-thresholds = np.arange(0.5,0.76,0.05)
-thresholds = [round(th,2) for th in thresholds]
+thresholds = [0.5,0.75,0.95]
 class Trainer:
-    def __init__(self,cfg,datasets,net,epoch):
+    def __init__(self,cfg,datasets,net,loss,epoch):
         self.cfg = cfg
         if 'train' in datasets:
             self.trainset = datasets['train']
@@ -42,7 +40,7 @@ class Trainer:
         start,total = epoch
         self.start = start        
         self.total = total
-        self.loss = MyLoss_v2()
+        self.loss = loss
         log_dir = os.path.join(self.checkpoints,'logs')
         if not(os.path.exists(log_dir)):
             os.mkdir(log_dir)
@@ -113,6 +111,32 @@ class Trainer:
             self.bestMovingAvg = self.movingAvg
             self.bestMovingAvgEpoch = epoch
             self.save_epoch('bestm',epoch)
+
+    def train_one_epoch(self):
+        running_loss ={'xy':0.0,'wh':0.0,'conf':0.0,'cls':0.0,'obj':0.0,'all':0.0}
+        self.net.train()
+        n = len(self.trainset)
+        for i,data in tqdm(enumerate(self.trainset)):
+            inputs,labels = data
+            start = time.time()
+            outs = self.net(inputs.to(self.device).float())
+            net_time += time.time()-start
+            start = time.time()
+            labels = labels.to(self.device).float()
+            loss,display = self.loss(outs,labels)
+            loss_time += time.time()-start
+            start = time.time()
+            del inputs,outs,labels
+            for k in running_loss:
+                running_loss[k] += display[k].item()/n
+            running_loss['all'] += loss.item()/n
+            loss.backward()
+            grad_time += time.time()-start
+            if i == n-1 or (i+1) % self.upadte_grad_every_k_batch == 0:
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+            del loss
+        return running_loss
     def train(self):
         print("strat train:",self.name)
         print("start from epoch:",self.start)
@@ -120,40 +144,15 @@ class Trainer:
         self.optimizer.zero_grad()
         print(self.optimizer.param_groups[0]['lr'])
         epoch = self.start
-        n = len(self.trainset)
+        
         torch.autograd.set_detect_anomaly(True)
-        net_time = 0
-        loss_time = 0
-        grad_time = 0
         while epoch < self.total:
-            running_loss ={'loss_xy':0.0,'loss_wh':0.0,'loss_conf':0.0,'total':0.0,'loss_iou':0.0,'loss_gou':0.0,'all':0.0}
-            self.net.train()
-            for i,data in tqdm(enumerate(self.trainset)):
-                inputs,labels = data
-                start = time.time()
-                outs = self.net(inputs.to(self.device).float())
-                net_time += time.time()-start
-                start = time.time()
-                labels = labels.to(self.device).float()
-                loss,display = self.loss(outs,labels)
-                loss_time += time.time()-start
-                start = time.time()
-                del inputs,outs,labels
-                for k in display:
-                    running_loss[k] += display[k].item()/n
-                running_loss['all'] += loss.item()/n
-                loss.backward()
-                grad_time += time.time()-start
-                if i == n-1 or (i+1) % self.upadte_grad_every_k_batch == 0:
-                    self.optimizer.step()
-                    self.optimizer.zero_grad()
-                del loss
+            running_loss = self.train_one_epoch()            
             lr = self.optimizer.param_groups[0]['lr']
             self.logger.write_loss(epoch,running_loss,lr)
             #step lr
             self.lr_sheudler.step(running_loss['all'])
             lr_ = self.optimizer.param_groups[0]['lr']
-            print('Train Time:',1.0*int(net_time)/n,'Loss Time:',1.0*int(loss_time)/n,'Grad Time:',1.0*int(grad_time)/n)
             if lr_ != lr:
                 self.save_epoch(str(epoch),epoch)
             if (epoch+1)%self.save_every_k_epoch==0:
@@ -172,6 +171,7 @@ class Trainer:
                 
         print("Best mAP: {:.4f} at epoch {}".format(self.best_mAP, self.best_mAP_epoch))
         self.save_epoch(str(epoch-1),epoch-1)
+
     def validate(self,epoch,save=False):
         self.net.eval()
         res = {}
@@ -187,18 +187,18 @@ class Trainer:
                 outs = self.net(inputs.to(self.device).float())
                 pds = self.loss(outs,infer=True)
                 nB = pds.shape[0]
-                pds = pds.view(nB,-1,5)# resize to batch,pd_num,5 
                 for b in range(nB):
                     if labels.shape[0]==0:
                         break
-                    pred = pds[b].view(-1,5)
+                    pred = pds[b].view(-1,self.cfg.cls_num+5)
                     name = info['img_id'][b]
                     size = info['size'][b]
                     pred[:,[0,2]]*=size[1]
                     pred[:,[1,3]]*=size[0]
-                    pds_ = list(pred.cpu().numpy().astype(float))
-                    pds_ = [list(pd) for pd in pds_]
-                    res[name] = pds_
+                    if save:
+                        pds_ = list(pred.cpu().numpy().astype(float))
+                        pds_ = [list(pd) for pd in pds_]
+                        res[name] = pds_
                     pred_nms = non_maximum_supression(pred,self.conf_threshold, self.nms_threshold)
                     count+=1
                     total = 0
@@ -277,7 +277,7 @@ class Trainer:
         res = {}
         with torch.no_grad():
             for _,data in tqdm(enumerate(self.testset)):
-                inputs,labels,info = data
+                inputs,info = data
                 outs = self.net(inputs.to(self.device).float())
                 pds = self.loss(outs,infer=True)
                 nB = pds.shape[0]

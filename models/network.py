@@ -1,9 +1,8 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .backbone import ResNet,conv1x1,conv3x3
-from .mynets import LocNet,RefineNet 
-__all__=['Network','Networkv2','Networkv3','Networkv4','YOLO','YOLOv2']
+from .backbone import ResNet,conv1x1,conv3x3 
+__all__=['Networkv2','Networkv3','Networkv4','YOLO','YOLOu']
 class BaseBlock(nn.Module):
     multiple=2
     def __init__(self,in_channels,channels,stride=1):
@@ -67,21 +66,6 @@ class Bottleneck(nn.Module):
         y = self.relu(y)
 
         return y
-class Network(nn.Module):
-    def __init__(self,res,int_shape,cls_num,pretrained=True):
-        super(Network,self).__init__()
-        self.feat = ResNet(res)
-        if pretrained:
-            self.feat.load_from_url()
-        self.loc_net = LocNet(self.feat.channels,int_shape)
-        self.loc_net.initialization()
-        self.refine_net = RefineNet(self.loc_net.channel,cls_num)
-        self.refine_net.initialization()
-    def forward(self,x):
-        feats = self.feat(x)
-        locs,loc_feats = self.loc_net(feats)
-        results = self.refine_net(loc_feats)
-        return locs,results
 class Networkv2(nn.Module):
     def __init__(self,res,int_shape,cls_num,pretrained=True):
         super(Networkv2,self).__init__()
@@ -198,14 +182,10 @@ class YOLO(nn.Module):
         self.in_channel = 64
         self.in_channels = []
         encoders = []
-        convs = []
         for i in range(self.levels-1):
-            in_channel = self.in_channel
             encoders.append(self.make_encoders(channels[i],BaseBlock,depth=self.depths[i],downsample=True))
-            convs.append(nn.Sequential(conv1x1(in_channel,self.in_channel,stride=2),nn.BatchNorm2d(self.in_channel),self.relu))
         encoders.append(self.make_encoders(channels[-1],BaseBlock,depth=self.depths[-1],downsample=False))
         self.encoders = nn.ModuleList(encoders)
-        self.convs = nn.ModuleList(convs)
         self.channel = self.in_channels[-1]
         self.pred = self.make_prediction(cls_num)
         #for i in range(self.levels)
@@ -231,23 +211,19 @@ class YOLO(nn.Module):
         x = self.block2(x)
 
         x1 = self.encoders[0](x)
-        x1 += self.convs[0](x)
         
         x2 = self.encoders[1](x1)
-        x2 += self.convs[1](x1)
         
         x3 = self.encoders[2](x2)
-        x3 += self.convs[2](x2)
 
         x4 = self.encoders[3](x3)
-        x4 += self.convs[3](x3)
 
         x5 = self.encoders[4](x4)
 
         return self.pred(x5)
-class YOLOv2(nn.Module):
+class YOLOu(nn.Module):
     def __init__(self,res,int_cls_num,cls_num):
-        super(YOLOv2,self).__init__()
+        super(YOLOu,self).__init__()
         self.depths = [1,2,8,8,4]
         self.levels = len(self.depths)
         channels = [32,64,128,256,512]

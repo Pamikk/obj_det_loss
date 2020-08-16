@@ -6,7 +6,6 @@ import random
 import cv2
 import os
 
-from imutils import augment,resize,color_normalize
 
 #stack functions for collate_fn
 #Notice: all dicts need have same keys and all lists should have same length
@@ -25,48 +24,74 @@ def stack_list(lists):
     for k in range(len(lists[0])):
         res[k] = torch.stack([obj[k] for obj in lists])
     return res
-class WheatDet(data.Dataset):
-    def __init__(self,cfg,train=True):
+
+def brightness_scale(src,vs):
+    img = cv2.cvtColor(src,cv2.COLOR_RGB2HSV).astype(np.float)
+    img[:,:,2] *= (1+vs)
+    img[:,:,2][img[:,:,2]>255] = 255
+    return img
+
+def augment(src,ang,vs,flip=False):
+    #flip
+    if flip:
+        dst = cv2.flip(src,1)
+    else:
+        dst = src
+    #rotation
+    h,w,_ = dst.shape
+    center =(w/2,h/2)
+    mat = cv2.getRotationMatrix2D(center, ang, 1.0)
+    dst = cv2.warpAffine(dst,mat,(w,h))  
+    return brightness_scale(dst,vs),mat
+def resize(src,tsize):
+    dst = cv2.resize(src,(tsize[1],tsize[0]),interpolation=cv2.INTER_CUBIC)
+    return dst    
+
+def color_normalize(img,mean):
+    img = img.astype(np.float)
+    if img.max()>1:
+        img /= 255
+    img -= np.array(mean)/255
+    return img
+
+class VOC_dataset(data.Dataset):
+    def __init__(self,cfg,mode='train'):
         self.img_path = cfg.img_path
         self.cfg = cfg
-        file = json.load(open(cfg.file,'r'))
-        self.imgs = file[0]
-        self.annos = file[1]
-        self.train = train
-        self.max_num = 120
+        data = json.load(open(cfg.file,'r'))
+        self.imgs = list(data.keys())
+        self.annos = data
+        self.mode = mode
     def __len__(self):
         return len(self.imgs)
 
     def img_to_tensor(self,img):
-        return torch.tensor(np.transpose(img,[2,0,1]),dtype=torch.float)
-    def gen_gts(self,labels,pad=(0,0)):
-        gts = torch.zeros(labels.shape,dtype=torch.float)
-        if len(labels) == 0:
+        data = torch.tensor(np.transpose(img,[2,0,1]),dtype=torch.float)
+        data /= data.max()
+        return data
+    def gen_gts(self,anno,pad=(0,0)):
+        gts = torch.zeros((anno['obj_num'],5),dtype=torch.float)
+        if anno['obj_num'] == 0:
             return gts
-        n = len(labels)
-        xmins = labels[:,0] + pad[0]
-        ymins = labels[:,1] + pad[1]
-        ws = labels[:,2]
-        hs = labels[:,3]
-        xs,ys = xmins + ws/2, ymins + hs/2
-
-        gts = torch.tensor(np.stack([xs,ys,ws,hs],axis=1),dtype=torch.float)
+        bboxs = anno['']
+        for i in range(anno['obj_num']):
+            gts[i,0] = bboxs['label']
+            x1,y1,x2,y2 = bboxs['bbox']
+            gts[i,1:] =[(x1+x2)/2+pad[1]-1,(y1+y2)+pad[0]/2-1,x2-x1,y2-y1]
         return gts
-    def fill_with_zeros(self,labels,n):
-        gts = torch.zeros((self.max_num,labels.shape[-1]),dtype=torch.float)
-        gts[:n,:] = labels
-        return gts
+        
     def get_trans_gts(self,labels,size,mat=np.eye(3),flip=True):
         #transfer
         if len(labels)== 0:
             return labels
         h,w = size
         cos = abs(mat[0,0])
-        sin = abs(mat[0,1])        
-        xs = labels[:,0]
-        ys = labels[:,1]
-        ws = labels[:,2]
-        hs = labels[:,3]
+        sin = abs(mat[0,1])
+        xs = labels[:,1].clone()
+        ys = labels[:,2].clone()
+        ws = labels[:,3].clone()
+        hs = labels[:,4].clone()   
+        
         if flip:
             xs = w-1-xs
         
@@ -76,51 +101,11 @@ class WheatDet(data.Dataset):
 
         pts = np.stack([xs,ys,np.ones([n])],axis=1).T
         tpts = torch.tensor(np.dot(mat,pts).T)
-        labels[:,0] = tpts[:,0]*sx
-        labels[:,1] = tpts[:,1]*sy
-        mask = labels[:,0]>0
-        mask *= labels[:,0]<1
-        mask *= labels[:,1]>0
-        mask *= labels[:,1]<1    
-
-        labels[:,2] = (cos*ws + sin*hs)*sx
-        labels[:,3] = (cos*hs + sin*ws)*sy
-        labels = labels[mask,:]
+        labels[:,1] = tpts[:,0]*sx
+        labels[:,2] = tpts[:,1]*sy
+        labels[:,3] = (cos*ws + sin*hs)*sx
+        labels[:,4] = (cos*hs + sin*ws)*sy
         return labels
-    #process ground truths
-    #useful for keypoint heatmaps
-    def gen_heatmap(self,labels,sigmas):
-        tsize = self.cfg.int_shape
-        heatmaps = [np.zeros(tsize) for _ in sigmas]
-        for label in labels:
-            tmp = np.zeros(tsize)
-            x = int(label[0]*tsize[1])
-            y = int(label[1]*tsize[0])
-            if 0<=x< tsize[1] and 0<=y<tsize[0]:
-                tmp[y,x] = 1
-                for i,sigma in enumerate(sigmas):
-                    tmp_ = cv2.GaussianBlur(tmp,sigma,0)
-                    tmp_ /= tmp_.max()
-                    heatmaps[i] = np.maximum(heatmaps[i],tmp_)
-                # mutliple will calculate only once 
-                # use max to avoid two center make one middle point with greater score
-            else:
-                print(label)
-        heatmaps = [torch.tensor(heatmap,dtype=torch.float) for heatmap in heatmaps]
-        return heatmaps
-    def gen_attention_map(self,labels):
-        tsize = self.cfg.int_shape
-        heatmap = np.zeros(tsize)
-        for label in labels:
-            tmp = np.zeros(tsize)
-            x = int(label[0]*tsize[1])
-            y = int(label[1]*tsize[0])
-            if 0<=x< tsize[1] and 0<=y<tsize[0]:
-                heatmap = np.maximum(heatmaps,tmp)
-                # mutliple will calculate only once 
-                # use max to avoid two center make one middle point with greater score
-        heatmap =torch.tensor(heatmap,dtype=torch.float)
-        return heatmap
 
     def pad_to_square(self,img):
         h,w,_= img.shape
@@ -143,8 +128,8 @@ class WheatDet(data.Dataset):
         else:
             pad = (0,0)
         h,w,_ = img.shape
-        labels = self.gen_gts(np.array(anno["bbox"],dtype=np.float),pad)
-        if self.train:
+        labels = self.gen_gts(anno,pad)
+        if self.mode=='train':
             if random.uniform(0,1)>=0.25:
                 rot = random.uniform(-1,1)*self.cfg.rot
             else:
@@ -158,38 +143,44 @@ class WheatDet(data.Dataset):
             else:
                 vs = 0
             dst,mat = augment(img,rot,vs,flip)
-            data = resize(dst,self.cfg.inp_size)
-            labels = self.get_trans_gts(labels,(h,w),mat,flip)
-            data = color_normalize(data,self.cfg.RGB_mean)
-            data = self.img_to_tensor(data)
+            labels = self.get_trans_gts(labels,(h,w),mat,flip)#normalize to[0,1]
+            data = self.img_to_tensor(dst)
             #labels = self.fill_with_zeros(labels,n)
             return data,labels        
         else:
             #validation set
-            data = color_normalize(img,self.cfg.RGB_mean)
-            data = resize(data,self.cfg.inp_size)
+            tsize = (round(h/64)*64,round(w/64)*64)
+            data = resize(data,tsize)
             data = self.img_to_tensor(data)
-            #labels = self.fill_with_zeros(labels,n)
-            info ={'size':(h,w),'img_id':name}
-            return data,labels,info
+            info ={'size':(h,w),'img_id':name,'pad':pad}
+            if self.mode=='val':
+                return data,labels,info
+            else:
+                return data,info
     def collate_fn(self,batch):
-        if self.train:
-            data,labels = list(zip(*batch))
-        else:
+        if self.mode=='test':
+            data,info = list(zip(*batch))
+            data = torch.stack(data)
+            info = stack_dicts(info)
+            return data,info 
+        elif self.mode=='val':
             data,labels,info = list(zip(*batch))
-            info = stack_dicts(info)   
+            info = stack_dicts(info)
+        elif self.mode=='train':
+            data,labels = list(zip(*batch))
+            tsize = self.cfg.tsizes    
         tmp =[]
-        data = torch.stack(data)            
+                   
                 
         for i,bboxes in enumerate(labels):
             if len(bboxes)>0:
-                label = torch.zeros(len(bboxes),5)
+                label = torch.zeros(len(bboxes),6)
                 label[:,1:] = bboxes
                 label[:,0] = i
                 tmp.append(label)
         if len(tmp)>0:
             labels = torch.cat(tmp,dim=0)
-            labels = labels.reshape(-1,5)
+            labels = labels.reshape(-1,6)
         else:
             labels = torch.tensor(tmp,dtype=torch.float)
         if self.train:
