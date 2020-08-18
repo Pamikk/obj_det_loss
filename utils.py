@@ -25,15 +25,20 @@ class Logger(object):
             if losses[k]>0:            
                 self.writer.add_scalar('Train/'+k,losses[k],epoch)            
                 print(k,':',losses[k])
+                #self.writer.flush()
         tmp+= str(round(losses['all'],5))+'\t'
         self.write_line2file('train',tmp)
-    def write_metrics(self,epoch,metrics,save=[],mode='Val'):
+    def write_metrics(self,epoch,metrics,save=[],mode='Val',log=True):
         tmp =str(epoch)+'\t'
         print("validation epoch:",epoch)
         for k in metrics:
             if k in save:
-                tmp +=str(metrics[k])+'\t'            
-            self.writer.add_scalar(mode+'/'+k,metrics[k],epoch)
+                tmp +=str(metrics[k])+'\t'
+            if log:
+                tag = mode+'/'+k            
+                print(tag)
+                self.writer.add_scalar(tag,metrics[k],epoch)
+                #self.writer.flush()
             print(k,':',metrics[k])
         
         self.write_line2file('val',tmp)
@@ -228,25 +233,27 @@ def cal_metrics_wo_cls(pd,gt,threshold=0.5):
 
 
     
-def non_maximum_supression(preds,conf_threshold=0.5,nms_threshold = 0.4):
-    preds = preds[preds[:,4] >= conf_threshold]
-    if len(preds) == 0:
-        return preds    
+def non_maximum_supression(preds,conf_threshold=0.5,nms_threshold = 0.4):   
+    preds = preds[preds[:,4] >= conf_threshold]       
     score = preds[:,4]*preds[:,5:].max(1)[0]
     idx = torch.argsort(score,descending=True)
     preds = preds[idx]
+    preds = preds[score[idx] >= conf_threshold]    
+    #preds = preds[score >= conf_threshold] #should only use object score
+    if len(preds) == 0:
+        return preds 
     cls_confs,cls_labels = torch.max(preds[:,5:],dim=1,keepdim=True)
     dets = torch.cat((preds[:,:5],cls_confs.float(),cls_labels.float()),dim=1)
     keep = []
     while len(dets)>0:
-        ious = iou_wt_center(dets[0,:4],dets[:,:4])
-        if not(ious[0]>=0.7):
-            print("?")
-            ious[0] =1
-        mask = (ious>nms_threshold)&(dets[0,-1]==dets[:,-1])
-        #hard-nms
+        mask = dets[0,-1]==dets[:,-1]
         new = dets[0]
         keep.append(new)
+        ious = iou_wt_center(dets[0,:4],dets[:,:4])
+        if not(ious[0]>=0.7):
+            ious[0] =1
+        mask = mask & (ious>nms_threshold)
+        #hard-nms        
         dets = dets[~mask]
     return torch.stack(keep)
 def non_maximum_supression_soft(preds,conf_threshold=0.5,nms_threshold=0.4):
@@ -255,15 +262,16 @@ def non_maximum_supression_soft(preds,conf_threshold=0.5,nms_threshold=0.4):
     dets = torch.cat((preds[:,:5],cls_confs.float(),cls_labels.float()),dim=1)
     while len(dets)>0:
         val,idx = torch.max(dets[:,4]*dets[:,5],dim=0)
-        val = preds[idx,4]
         if val<conf_threshold:
             break
+        pd = dets[idx]
         dets = torch.cat((dets[:idx],dets[idx+1:]))
-        ious = iou_wt_center(bbox,dets[:,:4])
-        mask = ious>nms_threshold
+        ious = iou_wt_center(pd[:4],dets[:,:4])
+        mask = (ious>nms_threshold) & (pd[-1]==dets[:,-1])
         #hard-nms
-        keep.append(bbox)
+        keep.append(pd)
         dets[mask,4] *= (1-ious[mask])*(1-val)
+    print(len(keep))
     return torch.stack(keep)
 def visualization():
     pass

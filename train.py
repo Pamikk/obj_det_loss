@@ -30,11 +30,14 @@ def main(args,cfgs):
     #network
     network = NetAPI(config,args.net)
     loss = LossAPI(config,args.loss)
-
+    torch.cuda.empty_cache()
     det = Trainer(config,datasets,network,loss,(args.resume,args.epochs))
     if args.val:
-        det.validate(det.start-1,mode='val')
-        det.validate(det.start-1,mode='train')
+        #metrics = det.validate(det.start-1,mode='val')
+        
+        #det.logger.write_metrics(det.start-1,metrics,[])
+        metrics = det.validate(det.start-1,mode='train')
+        det.logger.write_metrics(det.start-1,metrics,[],mode='Trainval')
     else:
         det.train()
 if __name__ == "__main__":

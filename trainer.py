@@ -49,7 +49,7 @@ class Trainer:
         torch.cuda.empty_cache()
         self.save_every_k_epoch = cfg.save_every_k_epoch #-1 for not save and validate
         self.val_every_k_epoch = 10
-        self.upadte_grad_every_k_batch = 4
+        self.upadte_grad_every_k_batch = 2
 
         self.best_mAP = 0
         self.best_mAP_epoch = 0
@@ -62,7 +62,7 @@ class Trainer:
         self.nms_threshold = cfg.nms_threshold
         self.conf_threshold = cfg.dc_threshold
         self.save_pred = False
-        self.adjust_lr = True
+        self.adjust_lr = False
         #load from epoch if required
         if start>0:
             self.load_epoch(str(start))
@@ -114,6 +114,10 @@ class Trainer:
             self.bestMovingAvg = self.movingAvg
             self.bestMovingAvgEpoch = epoch
             self.save_epoch('bestm',epoch)
+    def logMemoryUsage(self, additionalString=""):
+        if torch.cuda.is_available():
+            print(additionalString + "Memory {:.0f}Mb max, {:.0f}Mb current".format(
+                torch.cuda.max_memory_allocated() / 1024 / 1024, torch.cuda.memory_allocated() / 1024 / 1024))
 
     def train_one_epoch(self):
         running_loss ={'xy':0.0,'wh':0.0,'conf':0.0,'cls':0.0,'obj':0.0,'all':0.0,'iou':0.0,'gou':0.0}
@@ -133,6 +137,7 @@ class Trainer:
                 self.optimizer.step()
                 self.optimizer.zero_grad()
             del loss
+        self.logMemoryUsage()
         return running_loss
     def train(self):
         print("strat train:",self.name)
@@ -154,8 +159,10 @@ class Trainer:
                 self.save_epoch(str(epoch),epoch)
             if (epoch+1)%self.save_every_k_epoch==0:
                 self.save_epoch(str(epoch),epoch)
-            if (epoch+1)%self.val_every_k_epoch==0:
-                mAP = self.validate(epoch,'val',self.save_pred)
+            if (epoch+1)%self.val_every_k_epoch==0:                
+                metrics = self.validate(epoch,'val',self.save_pred)
+                self.logger.write_metrics(epoch,metrics,tosave)
+                mAP = metrics['mAP']
                 self._updateMetrics(mAP,epoch)
                 if mAP >= self.best_mAP:
                     self.best_mAP = mAP
@@ -163,12 +170,12 @@ class Trainer:
                     self.save_epoch('best',epoch)
                 print("best so far with:",self.best_mAP)
                 if self.trainval:
-                    self.validate(epoch,'train',self.save_pred)
+                    metrics = self.validate(epoch,'train',self.save_pred)
+                    self.logger.write_metrics(epoch,metrics,tosave,mode='Trainval')
             epoch +=1
                 
         print("Best mAP: {:.4f} at epoch {}".format(self.best_mAP, self.best_mAP_epoch))
         self.save_epoch(str(epoch-1),epoch-1)
-
     def validate(self,epoch,mode,save=False):
         self.net.eval()
         res = {}
@@ -195,7 +202,10 @@ class Trainer:
                     gts = labels[labels[:,0]==b,1:]
                     name = info['img_id'][b]
                     size = info['size'][b]
+                    pad = info['pad'][b]
                     pred[:,:4]*=size
+                    pred[:,0] -= pad[1]
+                    pred[:,1] -= pad[0]
                     if save:
                         pds_ = list(pred.cpu().numpy().astype(float))
                         pds_ = [list(pd) for pd in pds_]
@@ -217,12 +227,12 @@ class Trainer:
             metrics['Recall/'+str(th)] = 1.0*recalls[th]/count
         mAP = 1.0*mAP/count
         metrics['mAP'] = mAP
-        self.logger.write_metrics(epoch,metrics,tosave)
+        
         
         if save:
             json.dump(res,open(os.path.join(self.predictions,'pred_epoch_'+str(epoch)+'.json'),'w'))
         
-        return mAP
+        return metrics
     def test(self):
         self.net.eval()
         res = {}
@@ -237,8 +247,10 @@ class Trainer:
                     pred = pds[b].view(-1,5)
                     name = info['img_id'][b]
                     size = info['size'][b]
-                    pred[:,[0,2]]*=size[1]
-                    pred[:,[1,3]]*=size[0]                    
+                    pad = info['pad'][b]
+                    pred[:,:4]*=size
+                    pred[:,0] -= pad[1]
+                    pred[:,1] -= pad[0]                
                     pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)
                     pds_ = list(pred_nms.cpu().numpy().astype(float))
                     pds_ = [list(pd) for pd in pds_]

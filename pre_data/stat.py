@@ -105,15 +105,25 @@ def analyze_xy(annos):
     print('finish')
 def analyze_size(annos):
     res = {}
+    res2 = {}
     for name in annos:
         size = annos[name]['size']
         w,h,_ = size
-        ts = max(round(w/32)*64,round(h/64)*64)
+        ts = round(w/64)*64/(round(h/64)*64)
         if ts in res.keys():
             res[ts]+=1
         else:
             res[ts] = 1
+        ts = round(max(h,w)/64)*64
+        if ts in res2.keys():
+            res2[ts]+= 1/len(annos)
+        else:
+            res2[ts] = 1/len(annos)
+
     print(res)
+    print(len(res))
+    print(res2)
+    print(len(res2))
 path ='annotation.json'
 
 annos = json.load(open(path,'r'))
