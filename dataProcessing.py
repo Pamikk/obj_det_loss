@@ -5,6 +5,7 @@ import numpy as np
 import random
 import cv2
 import os
+from torch.nn import functional as F
 
 
 #stack functions for collate_fn
@@ -44,7 +45,7 @@ def augment(src,ang,vs,flip=False):
     dst = cv2.warpAffine(dst,mat,(w,h))  
     return brightness_scale(dst,vs),mat
 def resize(src,tsize):
-    dst = cv2.resize(src,(tsize[1],tsize[0]),interpolation=cv2.INTER_CUBIC)
+    dst = cv2.resize(src,(tsize[1],tsize[0]),interpolation=cv2.INTER_LINEAR)
     return dst    
 
 def color_normalize(img,mean):
@@ -73,11 +74,11 @@ class VOC_dataset(data.Dataset):
         gts = torch.zeros((anno['obj_num'],5),dtype=torch.float)
         if anno['obj_num'] == 0:
             return gts
-        bboxs = anno['']
+        bboxs = anno['annotation']
         for i in range(anno['obj_num']):
-            gts[i,0] = bboxs['label']
-            x1,y1,x2,y2 = bboxs['bbox']
-            gts[i,1:] =[(x1+x2)/2+pad[1]-1,(y1+y2)+pad[0]/2-1,x2-x1,y2-y1]
+            gts[i,0] = bboxs[i]['label']
+            x1,y1,x2,y2 = bboxs[i]['bbox']
+            gts[i,1:] =torch.tensor([(x1+x2)/2+pad[1]-1,(y1+y2)/2+pad[0]-1,x2-x1,y2-y1],dtype=torch.float)
         return gts
         
     def get_trans_gts(self,labels,size,mat=np.eye(3),flip=True):
@@ -90,8 +91,7 @@ class VOC_dataset(data.Dataset):
         xs = labels[:,1].clone()
         ys = labels[:,2].clone()
         ws = labels[:,3].clone()
-        hs = labels[:,4].clone()   
-        
+        hs = labels[:,4].clone()
         if flip:
             xs = w-1-xs
         
@@ -110,11 +110,11 @@ class VOC_dataset(data.Dataset):
     def pad_to_square(self,img):
         h,w,_= img.shape
         diff = abs(h-w)
-        if h>w:
+        if w>h:
             pad = (diff//2,0,diff-diff//2,0)
         else:
             pad = (0,diff//2,0,diff-diff//2)
-        img = cv2.copyMakeBorder(img,pad[0],pad[1],pad[2],pad[3],cv2.BORDER_CONSTANT,0)
+        img = cv2.copyMakeBorder(img,pad[0],pad[2],pad[1],pad[3],cv2.BORDER_CONSTANT,0)
         return img,(pad[0],pad[1])
 
     def __getitem__(self,idx):
@@ -149,10 +149,10 @@ class VOC_dataset(data.Dataset):
             return data,labels        
         else:
             #validation set
-            tsize = (round(h/64)*64,round(w/64)*64)
-            data = resize(data,tsize)
+            tsize = (448,448)# (h//64*64,w//64*64)
+            data = resize(img,tsize)
             data = self.img_to_tensor(data)
-            info ={'size':(h,w),'img_id':name,'pad':pad}
+            info ={'size':h,'img_id':name,'pad':pad}
             if self.mode=='val':
                 return data,labels,info
             else:
@@ -166,9 +166,11 @@ class VOC_dataset(data.Dataset):
         elif self.mode=='val':
             data,labels,info = list(zip(*batch))
             info = stack_dicts(info)
+            data = torch.stack(data)
         elif self.mode=='train':
             data,labels = list(zip(*batch))
-            tsize = self.cfg.tsizes    
+            tsize = random.sample(self.cfg.sizes,1)[0]
+            data = torch.stack([F.interpolate(img.unsqueeze(0),tsize,mode='bilinear',align_corners=True).squeeze(0) for img in data])    
         tmp =[]
                    
                 
@@ -183,7 +185,7 @@ class VOC_dataset(data.Dataset):
             labels = labels.reshape(-1,6)
         else:
             labels = torch.tensor(tmp,dtype=torch.float)
-        if self.train:
+        if self.mode=='train':
             return data,labels
         else:
             return data,labels,info

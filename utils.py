@@ -5,6 +5,11 @@ import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 import os 
 import json
+voc_classes= {'__background__':0, 'aeroplane':1, 'bicycle':2, 
+          'bird':3, 'boat':4, 'bottle':5,'bus':6, 'car':7,
+           'cat':8, 'chair':9,'cow':10, 'diningtable':11, 'dog':12,
+            'horse':13,'motorbike':14, 'person':15, 'pottedplant':16,
+            'sheep':17, 'sofa':18, 'train':19, 'tvmonitor':20}
 class Logger(object):
     def __init__(self,log_dir):
         self.writer = SummaryWriter(log_dir)
@@ -17,10 +22,9 @@ class Logger(object):
         print('Epoch',':',epoch,'-',lr)
         self.writer.add_scalar('lr',math.log(lr),epoch)
         for k in losses:            
-            self.writer.add_scalar('Train/'+k,losses[k],epoch)
-            tmp+= str(round(losses[k],5))+'\t'
+            self.writer.add_scalar('Train/'+k,losses[k],epoch)            
             print(k,':',losses[k])
-        self.writer.flush()
+        tmp+= str(round(losses['all'],5))+'\t'
         self.write_line2file('train',tmp)
     def write_metrics(self,epoch,metrics,save=[],mode='Val'):
         tmp =str(epoch)+'\t'
@@ -182,10 +186,13 @@ def iou_wt_center_np(bbox1,bbox2):
     union = area1+area2 - inter +1e-16
     return inter/union
 
-def cal_metrics(pd,gt,threshold=0.5):
+
+
+def cal_metrics_wo_cls(pd,gt,threshold=0.5):
     pd = pd.cpu().numpy()#n
     gt = gt.cpu().numpy()#m
     pd_bboxes = pd[:,:4]
+    gt = gt[:,1:]
     m = len(gt)
     n = len(pd_bboxes)
     if n>0 and m>0:
@@ -221,30 +228,36 @@ def cal_metrics(pd,gt,threshold=0.5):
 
     
 def non_maximum_supression(preds,conf_threshold=0.5,nms_threshold = 0.4):
-    preds = preds[preds[:,-1] >= conf_threshold]
+    preds = preds[preds[:,4] >= conf_threshold]
     if len(preds) == 0:
         return preds
-    idx = np.argsort(-1*preds[:,-1].cpu().numpy())
-    pds = preds[idx].clone()
+    score = preds[:,4]*preds[:,5:].max(1)[0]
+    idx = torch.argsort(score,descending=True)
+    preds = preds[idx]
+    cls_confs,cls_labels = torch.max(preds[:,5:],dim=1,keepdim=True)
+    dets = torch.cat((preds[:,:5],cls_confs.float(),cls_labels.float()),dim=1)
     keep = []
-    while len(pds)>0:
-        ious = iou_wt_center(pds[0,:4],pds[0:,:4])
+    while len(dets)>0:
+        ious = iou_wt_center(dets[0,:4],dets[:,:4])
         if not(ious[0]>=0.7):
+            print("?")
             ious[0] =1
-        mask = ious>nms_threshold
+        mask = (ious>nms_threshold)&(dets[0,-1]==dets[:,-1])
         #hard-nms
-        new = pds[0,:4]
+        new = dets[0]
         keep.append(new)
-        pds = pds[~mask]
+        dets = dets[~mask]
     return torch.stack(keep)
 def non_maximum_supression_soft(preds,conf_threshold=0.5,nms_threshold=0.4):
     keep = []
-    pds = preds.clone()
-    while len(pds)>0:
-        val,idx = torch.max(pds[:,-1],dim=0)
+    cls_confs,cls_labels = torch.max(preds[:,5:],dim=1,keepdim=True)
+    dets = torch.cat((preds[:,:5],cls_confs.float(),cls_labels.float()),dim=1)
+    while len(dets)>0:
+        val,idx = torch.max(dets[:,4]*dets[:,5],dim=0)
+        val = preds[idx,4]
         if val<conf_threshold:
             break
-        bbox = pds[idx,:4]
+        pd = preds
         pds = torch.cat((pds[:idx],pds[idx+1:]))
         ious = iou_wt_center(bbox,pds[:,:4])
         mask = ious>nms_threshold
@@ -252,9 +265,6 @@ def non_maximum_supression_soft(preds,conf_threshold=0.5,nms_threshold=0.4):
         keep.append(bbox)
         pds[mask,-1] *= (1-ious[mask])*(1-val)
     return torch.stack(keep)
-
-
-
 def visualization():
     pass
 def test_pds():

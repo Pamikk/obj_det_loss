@@ -5,10 +5,11 @@ import torch
 from torch.utils.data import DataLoader
 ###files
 from config import Config as cfg
-from dataProcessing import WheatDet
+from dataProcessing import VOC_dataset as dataset
 from models.network import *
 from trainer import Trainer
 import warnings
+from loss_funcs import LossAPI
 
 warnings.filterwarnings('ignore')
 if __name__ == "__main__":
@@ -26,9 +27,9 @@ if __name__ == "__main__":
     config  = cfg()
     val_cfg = cfg('val')
     trainval_cfg = cfg('trainval')
-    train_set = WheatDet(config)
-    val_set = WheatDet(val_cfg,train=False)
-    trainval_set = WheatDet(trainval_cfg,train=False)
+    train_set = dataset(config)
+    val_set = dataset(val_cfg,mode='val')
+    trainval_set = dataset(trainval_cfg,mode='val')
     train_loader = DataLoader(train_set,batch_size=config.bs,shuffle=True,pin_memory=False,collate_fn=train_set.collate_fn)
     val_loader = DataLoader(val_set,batch_size=val_cfg.bs,shuffle=False,pin_memory=False,collate_fn=val_set.collate_fn)
     trainval_loader = DataLoader(trainval_set,batch_size=trainval_cfg.bs,shuffle=False,pin_memory=False,collate_fn=val_set.collate_fn)
@@ -38,11 +39,12 @@ if __name__ == "__main__":
     torch.cuda.empty_cache()
     config.res = args.res
     #network
-    network = YOLO(config.res,config.int_shape,config.cls_num)
+    network = YOLO(config.anchor_num,config.cls_num)
+    loss = LossAPI(config)
 
-    det = Trainer(config,datasets,network,(args.resume,args.epochs))
+    det = Trainer(config,datasets,network,loss,(args.resume,args.epochs))
     if args.val:
-        det.validate(det.start-1,True)
-        det.validate_train(det.start-1)
+        det.validate(det.start-1,mode='val')
+        det.validate(det.start-1,mode='train')
     else:
         det.train()

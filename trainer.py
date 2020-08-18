@@ -8,8 +8,9 @@ from tqdm import tqdm
 import os
 import json
 
-from utils import Logger,cal_metrics
-from utils import non_maximum_supression_soft as non_maximum_supression
+from utils import Logger
+from utils import cal_metrics_wo_cls as cal_metrics
+from utils import non_maximum_supression as non_maximum_supression
 tosave=['mAP']
 thresholds = [0.5,0.75,0.95]
 class Trainer:
@@ -31,7 +32,7 @@ class Trainer:
         self.device = cfg.device
         self.net = self.net
         self.optimizer = optim.Adam(self.net.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
-        self.lr_sheudler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,mode='min', factor=cfg.lr_factor, threshold=0.0001,patience=5,min_lr=cfg.min_lr)
+        self.lr_sheudler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,mode='min', factor=cfg.lr_factor, threshold=0.0001,patience=2,min_lr=cfg.min_lr)
         if not(os.path.exists(self.checkpoints)):
             os.mkdir(self.checkpoints)
         self.predictions = os.path.join(self.checkpoints,'pred')
@@ -118,20 +119,13 @@ class Trainer:
         n = len(self.trainset)
         for i,data in tqdm(enumerate(self.trainset)):
             inputs,labels = data
-            start = time.time()
             outs = self.net(inputs.to(self.device).float())
-            net_time += time.time()-start
-            start = time.time()
             labels = labels.to(self.device).float()
-            loss,display = self.loss(outs,labels)
-            loss_time += time.time()-start
-            start = time.time()
+            display,loss = self.loss(outs,labels)
             del inputs,outs,labels
             for k in running_loss:
-                running_loss[k] += display[k].item()/n
-            running_loss['all'] += loss.item()/n
+                running_loss[k] += display[k]/n
             loss.backward()
-            grad_time += time.time()-start
             if i == n-1 or (i+1) % self.upadte_grad_every_k_batch == 0:
                 self.optimizer.step()
                 self.optimizer.zero_grad()
@@ -158,7 +152,7 @@ class Trainer:
             if (epoch+1)%self.save_every_k_epoch==0:
                 self.save_epoch(str(epoch),epoch)
             if (epoch+1)%self.val_every_k_epoch==0:
-                mAP = self.validate(epoch,self.save_pred)
+                mAP = self.validate(epoch,'val',self.save_pred)
                 self._updateMetrics(mAP,epoch)
                 if mAP >= self.best_mAP:
                     self.best_mAP = mAP
@@ -166,23 +160,27 @@ class Trainer:
                     self.save_epoch('best',epoch)
                 print("best so far with:",self.best_mAP)
                 if self.trainval:
-                    self.validate_train(epoch,self.save_pred)
+                    self.validate(epoch,'train',self.save_pred)
             epoch +=1
                 
         print("Best mAP: {:.4f} at epoch {}".format(self.best_mAP, self.best_mAP_epoch))
         self.save_epoch(str(epoch-1),epoch-1)
 
-    def validate(self,epoch,save=False):
+    def validate(self,epoch,mode,save=False):
         self.net.eval()
         res = {}
         print('start Validation Epoch:',epoch)
+        if mode=='val':
+            valset = self.valset
+        else:
+            valset = self.trainval
         with torch.no_grad():
             APs = dict.fromkeys(thresholds,0)
             precisions = dict.fromkeys(thresholds,0)
             recalls = dict.fromkeys(thresholds,0)
             mAP = 0
             count = 0
-            for _,data in tqdm(enumerate(self.valset)):
+            for _,data in tqdm(enumerate(valset)):
                 inputs,labels,info = data
                 outs = self.net(inputs.to(self.device).float())
                 pds = self.loss(outs,infer=True)
@@ -191,10 +189,11 @@ class Trainer:
                     if labels.shape[0]==0:
                         break
                     pred = pds[b].view(-1,self.cfg.cls_num+5)
+                    gts = labels[labels[:,0]==b,1:]
                     name = info['img_id'][b]
                     size = info['size'][b]
-                    pred[:,[0,2]]*=size[1]
-                    pred[:,[1,3]]*=size[0]
+                    pred[:,[0,2]]*=size
+                    pred[:,[1,3]]*=size
                     if save:
                         pds_ = list(pred.cpu().numpy().astype(float))
                         pds_ = [list(pd) for pd in pds_]
@@ -203,7 +202,7 @@ class Trainer:
                     count+=1
                     total = 0
                     for th in thresholds:
-                        p,r,ap = cal_metrics(pred_nms,labels[labels[:,0]==b,1:],threshold= th)
+                        p,r,ap = cal_metrics(pred_nms,gts,threshold= th)
                         APs[th] += ap
                         precisions[th] += p
                         recalls[th] += r
@@ -217,56 +216,6 @@ class Trainer:
         mAP = 1.0*mAP/count
         metrics['mAP'] = mAP
         self.logger.write_metrics(epoch,metrics,tosave)
-        
-        if save:
-            json.dump(res,open(os.path.join(self.predictions,'pred_epoch_'+str(epoch)+'.json'),'w'))
-        
-        return mAP
-    def validate_train(self,epoch,save=False):
-        self.net.eval()
-        res = {}
-        print('start Validation Epoch:',epoch)
-        with torch.no_grad():
-            APs = dict.fromkeys(thresholds,0)
-            precisions = dict.fromkeys(thresholds,0)
-            recalls = dict.fromkeys(thresholds,0)
-            mAP = 0
-            count = 0
-            for _,data in tqdm(enumerate(self.trainval)):
-                inputs,labels,info = data
-                outs = self.net(inputs.to(self.device).float())
-                pds = self.loss(outs,infer=True)
-                nB = pds.shape[0]
-                pds = pds.view(nB,-1,5)# resize to batch,pd_num,5 
-                for b in range(nB):
-                    if labels.shape[0]==0:
-                        break
-                    pred = pds[b].view(-1,5)
-                    name = info['img_id'][b]
-                    size = info['size'][b]
-                    pred[:,[0,2]]*=size[1]
-                    pred[:,[1,3]]*=size[0]
-                    pds_ = list(pred.cpu().numpy().astype(float))
-                    pds_ = [list(pd) for pd in pds_]
-                    res[name] = pds_
-                    pred_nms = non_maximum_supression(pred,self.conf_threshold, self.nms_threshold)
-                    count += 1
-                    total = 0
-                    for th in thresholds:
-                        p,r,ap = cal_metrics(pred_nms,labels[labels[:,0]==b,1:],threshold= th)
-                        APs[th] += ap
-                        precisions[th] += p
-                        recalls[th] += r
-                        total +=ap
-                    mAP += 1.0*total/len(thresholds)
-        metrics = {}
-        for th in thresholds:
-            metrics['AP/'+str(th)] = 1.0*APs[th]/count
-            metrics['Precision/'+str(th)] = 1.0*precisions[th]/count
-            metrics['Recall/'+str(th)] = 1.0*recalls[th]/count
-        mAP = 1.0*mAP/count
-        metrics['mAP'] = mAP
-        self.logger.write_metrics(epoch,metrics,tosave,mode='Train')
         
         if save:
             json.dump(res,open(os.path.join(self.predictions,'pred_epoch_'+str(epoch)+'.json'),'w'))

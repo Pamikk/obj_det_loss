@@ -57,20 +57,20 @@ def split_annotation(anno,split_path):
     test = {}
     train = {}
     val = {}
+    trainval={}
     for name in test_list.readlines():
         name = name.strip()
         test[name] = anno[name]
+    count = 0
     for name in train_list.readlines():
         name = name.strip()
         train[name] = anno[name]
-    trainval = train.copy() 
+        if count<500:
+            trainval[name] = anno[name]
+        count+=1 
     for name in val_list.readlines():
         name = name.strip()
         val[name] = anno[name]
-    print(len(test),len(train),len(val))
-    for name in anno:
-        if (name not in test.keys()) and(name not in val.keys()) :
-            train[name] = anno[name]
     print(len(test),len(train),len(val))
     return test,train,val,trainval  
 
@@ -79,7 +79,7 @@ anno_path = '../../dataset/VOCdevkit/VOC2007/Annotations'
 #json.dump(annos,open('annotation.json','w'))
 annos = json.load(open('annotation.json','r'))
 
-split_path = '../../dataset/VOCdevkit/VOC2007/ImageSets/Layout'
+split_path = '../../dataset/VOCdevkit/VOC2007/ImageSets/Main'
 test,train,val,trainval = split_annotation(annos,split_path)
 json.dump(test,open('test.json','w'))
 json.dump(train,open('train.json','w'))

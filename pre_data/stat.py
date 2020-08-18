@@ -94,10 +94,30 @@ def analyze_hw(annos):
     km.initialization()
     km.iter(0)  
     print(mh,mw,mxh,mxw)
-path ='train.json'
+def analyze_xy(annos):
+    for name in annos:
+        size = annos[name]['size']
+        w,h,_ = size
+        for anno in annos[name]['annotation']:
+            xmin,ymin,xmax,ymax = anno['bbox']
+            if ymax > h or xmax >w:
+                print('???')
+    print('finish')
+def analyze_size(annos):
+    res = {}
+    for name in annos:
+        size = annos[name]['size']
+        w,h,_ = size
+        ts = max(round(w/32)*64,round(h/64)*64)
+        if ts in res.keys():
+            res[ts]+=1
+        else:
+            res[ts] = 1
+    print(res)
+path ='annotation.json'
 
 annos = json.load(open(path,'r'))
-analyze_hw(annos)
+analyze_size(annos)
 #img size:
 #96 100 500 500
 #overlap
