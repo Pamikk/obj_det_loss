@@ -341,7 +341,8 @@ class YOLOLossv3(nn.Module):
         pd_bboxes[...,0] = (xs + grid_x)/grid_size
         pd_bboxes[...,1] = (ys + grid_y)/grid_size
         pd_bboxes[...,2] = torch.exp(ws)*self.anchors_w
-        pd_bboxes[...,3] = torch.exp(hs)*self.anchors_h        
+        pd_bboxes[...,3] = torch.exp(hs)*self.anchors_h
+        nb = pred.shape[0]        
         if infer:
             return torch.cat((pd_bboxes.view(nb,-1,4),conf.view(nb,-1,1),cls_score.view(nb,-1,self.cls_num)),dim=-1)
         else:

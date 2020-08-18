@@ -231,8 +231,7 @@ def cal_metrics_wo_cls(pd,gt,threshold=0.5):
 def non_maximum_supression(preds,conf_threshold=0.5,nms_threshold = 0.4):
     preds = preds[preds[:,4] >= conf_threshold]
     if len(preds) == 0:
-        return preds
-    print(len(preds))    
+        return preds    
     score = preds[:,4]*preds[:,5:].max(1)[0]
     idx = torch.argsort(score,descending=True)
     preds = preds[idx]
