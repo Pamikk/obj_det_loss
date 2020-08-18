@@ -451,7 +451,7 @@ class YOLOLossv3_com(YOLOLossv3):
             loss_gou = torch.tensor(0.0,dtype=torch.float,device=self.device)
         res['iou'] = loss_iou.item()
         res['gou'] = loss_gou.item()
-        return loss_iou,res
+        return loss_gou+loss_wh+loss_xy,res
 
 class LossAPI(nn.Module):
     def __init__(self,cfg,loss):
