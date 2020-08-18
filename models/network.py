@@ -3,6 +3,9 @@ import torch.nn.functional as F
 
 from .backbone import ResNet,conv1x1,conv3x3 
 __all__=['Networkv2','Networkv3','Networkv4','YOLO','YOLOu']
+def NetAPI(cfg,net):
+    networks = {'yolo':YOLO}
+    return networks[net](cfg)
 class BaseBlock(nn.Module):
     multiple=2
     def __init__(self,in_channels,channels,stride=1):
@@ -171,7 +174,7 @@ class Networkv4(nn.Module):
                 x = F.interpolate(x, scale_factor=2, mode="bilinear", align_corners=False) + feats[i+1]      
         return [outs[-1]]
 class YOLO(nn.Module):
-    def __init__(self,anum,cnum):
+    def __init__(self,cfg):
         super(YOLO,self).__init__()
         self.depths = [1,2,8,8,4]
         self.levels = len(self.depths)
@@ -187,7 +190,7 @@ class YOLO(nn.Module):
         encoders.append(self.make_encoders(channels[-1],BaseBlock,depth=self.depths[-1],downsample=False))
         self.encoders = nn.ModuleList(encoders)
         self.channel = self.in_channels[-1]
-        self.pred = self.make_prediction(anum*(5+cnum))
+        self.pred = self.make_prediction(cfg.anchor_num*(5+cfg.cls_num))
         #for i in range(self.levels)
     def make_encoders(self,channel,block,depth=1,downsample=False):
         blocks = [block(self.in_channel,channel)]

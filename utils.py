@@ -21,9 +21,10 @@ class Logger(object):
         tmp = str(epoch)+'\t'+str(lr)+'\t'
         print('Epoch',':',epoch,'-',lr)
         self.writer.add_scalar('lr',math.log(lr),epoch)
-        for k in losses:            
-            self.writer.add_scalar('Train/'+k,losses[k],epoch)            
-            print(k,':',losses[k])
+        for k in losses:
+            if losses[k]>0:            
+                self.writer.add_scalar('Train/'+k,losses[k],epoch)            
+                print(k,':',losses[k])
         tmp+= str(round(losses['all'],5))+'\t'
         self.write_line2file('train',tmp)
     def write_metrics(self,epoch,metrics,save=[],mode='Val'):

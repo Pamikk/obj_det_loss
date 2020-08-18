@@ -114,7 +114,7 @@ class Trainer:
             self.save_epoch('bestm',epoch)
 
     def train_one_epoch(self):
-        running_loss ={'xy':0.0,'wh':0.0,'conf':0.0,'cls':0.0,'obj':0.0,'all':0.0}
+        running_loss ={'xy':0.0,'wh':0.0,'conf':0.0,'cls':0.0,'obj':0.0,'all':0.0,'iou':0.0,'gou':0.0}
         self.net.train()
         n = len(self.trainset)
         for i,data in tqdm(enumerate(self.trainset)):
@@ -124,7 +124,8 @@ class Trainer:
             display,loss = self.loss(outs,labels)
             del inputs,outs,labels
             for k in running_loss:
-                running_loss[k] += display[k]/n
+                if k in display.keys():
+                    running_loss[k] += display[k]/n
             loss.backward()
             if i == n-1 or (i+1) % self.upadte_grad_every_k_batch == 0:
                 self.optimizer.step()
