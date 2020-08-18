@@ -379,6 +379,8 @@ class YOLOLossv3(nn.Module):
         loss_conf_noobj = self.noobject_scale*bce_loss(pds[noobj_mask],tconf[noobj_mask])
 
         loss_conf = loss_conf_noobj+loss_conf_obj
+        res['obj'] = loss_conf_obj.item()
+        res['conf'] = loss_conf.item()
         return loss_conf,res
     
     def forward(self,out,gts=None,infer=False):

@@ -171,7 +171,7 @@ class VOC_dataset(data.Dataset):
         elif self.mode=='train':
             data,labels = list(zip(*batch))
             tsize = random.sample(self.cfg.sizes,1)[0]
-            data = torch.stack([F.interpolate(img.unsqueeze(0),tsize,mode='bilinear',align_corners=True).squeeze(0) for img in data])    
+            data = torch.stack([F.interpolate(img.unsqueeze(0),tsize,mode='bilinear',align_corners=True).squeeze(0) for img in data]) #multi-scale-training   
         tmp =[]
                    
                 
