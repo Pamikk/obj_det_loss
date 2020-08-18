@@ -10,7 +10,7 @@ import json
 
 from utils import Logger
 from utils import cal_metrics_wo_cls as cal_metrics
-from utils import non_maximum_supression as non_maximum_supression
+from utils import non_maximum_supression as nms
 tosave=['mAP']
 thresholds = [0.5,0.75,0.95]
 class Trainer:
@@ -193,13 +193,12 @@ class Trainer:
                     gts = labels[labels[:,0]==b,1:]
                     name = info['img_id'][b]
                     size = info['size'][b]
-                    pred[:,[0,2]]*=size
-                    pred[:,[1,3]]*=size
+                    pred[:,:4]*=size
                     if save:
                         pds_ = list(pred.cpu().numpy().astype(float))
                         pds_ = [list(pd) for pd in pds_]
                         res[name] = pds_
-                    pred_nms = non_maximum_supression(pred,self.conf_threshold, self.nms_threshold)
+                    pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)
                     count+=1
                     total = 0
                     for th in thresholds:
@@ -238,7 +237,7 @@ class Trainer:
                     size = info['size'][b]
                     pred[:,[0,2]]*=size[1]
                     pred[:,[1,3]]*=size[0]                    
-                    pred_nms = non_maximum_supression(pred,self.conf_threshold, self.nms_threshold)
+                    pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)
                     pds_ = list(pred_nms.cpu().numpy().astype(float))
                     pds_ = [list(pd) for pd in pds_]
                     res[name] = pds_

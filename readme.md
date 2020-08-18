@@ -11,15 +11,16 @@ To do List
 + [ ] Mirgrate original model to VOC 2007
 + [ ] Revise codes to be more readable and concise
 + [ ] Loss_Funcs
-  + [ ] bbox loss 
+  + [ ] bbox loss
     + [x] Anchor-based Loss
-      + [x] YOLOv3-based 
+      + [x] YOLOv3-based
         + [x] Regression Loss
         + [x] IOU Loss,GIOU Loss$^{[1]}$
         + [x] Combined regression with GIOU
   + [ ] classification loss
 + [ ] Non-maximum-suppression
-  + [ ] Hard NMS
-  + [ ] Soft NMS
+  + [x] Hard NMS
+  + [x] Soft NMS$^{[2]}$
 
 [1]:"Generalized Intersection over Union: A Metric and A Loss for BOunding Box Regression":https://giou.stanford.edu/GIoU.pdf
+[2]:"Soft-NMS -- Improving Object Detection With One Line of Code":https://arxiv.org/pdf/1704.04503.pdf

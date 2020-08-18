@@ -33,7 +33,7 @@ def main(args,cfgs):
 
     det = Trainer(config,datasets,network,loss,(args.resume,args.epochs))
     if args.val:
-        det.validate(det.start-1,mode='val')
+        #det.validate(det.start-1,mode='val')
         det.validate(det.start-1,mode='train')
     else:
         det.train()

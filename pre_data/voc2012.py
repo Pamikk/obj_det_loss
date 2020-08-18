@@ -65,7 +65,7 @@ def split_annotation(anno,split_path):
     for name in train_list.readlines():
         name = name.strip()
         train[name] = anno[name]
-        if count<500:
+        if count<200:
             trainval[name] = anno[name]
         count+=1 
     for name in val_list.readlines():

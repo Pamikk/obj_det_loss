@@ -258,13 +258,12 @@ def non_maximum_supression_soft(preds,conf_threshold=0.5,nms_threshold=0.4):
         val = preds[idx,4]
         if val<conf_threshold:
             break
-        pd = preds
-        pds = torch.cat((pds[:idx],pds[idx+1:]))
-        ious = iou_wt_center(bbox,pds[:,:4])
+        dets = torch.cat((dets[:idx],dets[idx+1:]))
+        ious = iou_wt_center(bbox,dets[:,:4])
         mask = ious>nms_threshold
         #hard-nms
         keep.append(bbox)
-        pds[mask,-1] *= (1-ious[mask])*(1-val)
+        dets[mask,4] *= (1-ious[mask])*(1-val)
     return torch.stack(keep)
 def visualization():
     pass

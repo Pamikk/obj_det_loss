@@ -110,6 +110,7 @@ class VOC_dataset(data.Dataset):
     def pad_to_square(self,img):
         h,w,_= img.shape
         diff = abs(h-w)
+        
         if w>h:
             pad = (diff//2,0,diff-diff//2,0)
         else:
@@ -149,7 +150,7 @@ class VOC_dataset(data.Dataset):
             return data,labels        
         else:
             #validation set
-            tsize = (448,448)# (h//64*64,w//64*64)
+            tsize = (h//64*64,w//64*64)
             data = resize(img,tsize)
             data = self.img_to_tensor(data)
             info ={'size':h,'img_id':name,'pad':pad}
