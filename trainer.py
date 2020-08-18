@@ -62,6 +62,7 @@ class Trainer:
         self.nms_threshold = cfg.nms_threshold
         self.conf_threshold = cfg.dc_threshold
         self.save_pred = False
+        self.adjust_lr = True
         #load from epoch if required
         if start>0:
             self.load_epoch(str(start))
@@ -88,12 +89,13 @@ class Trainer:
             print('load:'+model_path)
             info = torch.load(model_path)
             self.net.load_state_dict(info['net'])
-            self.optimizer.load_state_dict(info['optimizer'])#might have bugs about device
-            for state in self.optimizer.state.values():
-                for k, v in state.items():
-                    if isinstance(v, torch.Tensor):
-                        state[k] = v.to(self.device)
-            self.lr_sheudler.load_state_dict(info['lr_scheduler'])
+            if not(self.adjust_lr):
+                self.optimizer.load_state_dict(info['optimizer'])#might have bugs about device
+                for state in self.optimizer.state.values():
+                    for k, v in state.items():
+                        if isinstance(v, torch.Tensor):
+                            state[k] = v.to(self.device)
+                self.lr_sheudler.load_state_dict(info['lr_scheduler'])
             self.start = info['epoch']+1
             self.best_mAP = info['mAP']
             self.best_mAP_epoch = info['mAP_epoch']

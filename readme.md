@@ -15,12 +15,15 @@ To do List
     + [x] Anchor-based Loss
       + [x] YOLOv3-based
         + [x] Regression Loss
-        + [x] IOU Loss,GIOU Loss$^{[1]}$
+        + [x] IOU Loss
+        + [x] GIOU Loss$^{[1]}$#deal with gradient vanish caused by IOU is zero for non-overlap
         + [x] Combined regression with GIOU
   + [ ] classification loss
+     + [ ]dice loss$^{[2]}$ #help deal with class imbalance
 + [ ] Non-maximum-suppression
   + [x] Hard NMS
-  + [x] Soft NMS$^{[2]}$
+  + [x] Soft NMS$^{[3]}$
 
 [1]:"Generalized Intersection over Union: A Metric and A Loss for BOunding Box Regression":https://giou.stanford.edu/GIoU.pdf
-[2]:"Soft-NMS -- Improving Object Detection With One Line of Code":https://arxiv.org/pdf/1704.04503.pdf
+[2]:"v-net loss"
+[3]:"Soft-NMS -- Improving Object Detection With One Line of Code":https://arxiv.org/pdf/1704.04503.pdf
