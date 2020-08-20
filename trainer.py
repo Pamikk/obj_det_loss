@@ -49,7 +49,7 @@ class Trainer:
         torch.cuda.empty_cache()
         self.save_every_k_epoch = cfg.save_every_k_epoch #-1 for not save and validate
         self.val_every_k_epoch = 10
-        self.upadte_grad_every_k_batch = 2
+        self.upadte_grad_every_k_batch = 1
 
         self.best_mAP = 0
         self.best_mAP_epoch = 0
@@ -133,6 +133,7 @@ class Trainer:
                 if k in display.keys():
                     running_loss[k] += display[k]/n
             loss.backward()
+            
             if i == n-1 or (i+1) % self.upadte_grad_every_k_batch == 0:
                 self.optimizer.step()
                 self.optimizer.zero_grad()
@@ -147,7 +148,7 @@ class Trainer:
         print(self.optimizer.param_groups[0]['lr'])
         epoch = self.start
         
-        torch.autograd.set_detect_anomaly(True)
+        #torch.autograd.set_detect_anomaly(True)
         while epoch < self.total:
             running_loss = self.train_one_epoch()            
             lr = self.optimizer.param_groups[0]['lr']

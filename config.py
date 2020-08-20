@@ -21,8 +21,8 @@ class Config:
         self.bs = 1        
         
         if mode=='train':
-            self.file='pre_data/train.json'
-            self.bs = 8 # batch size
+            self.file='./pre_data/train.json'
+            self.bs = 20 # batch size
             #augmentation parameter
             self.rot = 0
             self.crop = 0.2
@@ -35,12 +35,12 @@ class Config:
             self.min_lr = 5e-5
             self.lr_factor = 0.1
             #exp_setting
-            self.save_every_k_epoch = 10
+            self.save_every_k_epoch = 1
 
         elif mode=='val':
-            self.file = 'pre_data/val.json'
+            self.file = './pre_data/val.json'
         elif mode=='trainval':
-            self.file = 'pre_data/trainval.json'
+            self.file = './pre_data/trainval.json'
         elif mode=='test':
-            self.file = 'pre_data/test.json'
+            self.file = './pre_data/test.json'
         

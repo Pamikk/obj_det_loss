@@ -20,7 +20,7 @@ def main(args,cfgs):
     train_set = dataset(config)
     val_set = dataset(val_cfg,mode='val')
     trainval_set = dataset(trainval_cfg,mode='val')
-    train_loader = DataLoader(train_set,batch_size=config.bs,shuffle=True,pin_memory=False,collate_fn=train_set.collate_fn)
+    train_loader = DataLoader(train_set,batch_size=args.bs,shuffle=True,pin_memory=False,collate_fn=train_set.collate_fn)
     val_loader = DataLoader(val_set,batch_size=val_cfg.bs,shuffle=False,pin_memory=False,collate_fn=val_set.collate_fn)
     trainval_loader = DataLoader(trainval_set,batch_size=trainval_cfg.bs,shuffle=False,pin_memory=False,collate_fn=val_set.collate_fn)
     datasets = {'train':train_loader,'val':val_loader,'trainval':trainval_loader}
@@ -49,6 +49,7 @@ if __name__ == "__main__":
     parser.add_argument("--val",type=bool,default=False,help="only validation")
     parser.add_argument("--loss",type=str,default='yolov3',help="loss type:yolov3|yolov3_iou|yolov3_gou|yolov3_com")
     parser.add_argument("--net",type=str,default='yolo',help="network type:yolo")
+    parser.add_argument("--bs",type=int,default=16,help="batchsize")
     args = parser.parse_args()
     cfgs = {}
     cfgs['train'] = cfg()
