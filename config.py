@@ -4,8 +4,8 @@ class Config:
     def __init__(self,mode='train'):
         #Path Setting
         self.test_img_path='../dataset/VOCdevkit/VOC2007/JPEGImages'
-        self.img_path = '../dataset/VOCdevkit/VOC2007/JPEGImages'
-        self.checkpoint='../checkpoints'
+        self.img_path = '../drive/My Drive/dataset/VOCdevkit/VOC2007/JPEGImages'
+        self.checkpoint='../drive/My Drive/checkpoints'
         self.cls_num = 20        
         self.res = 50
         self.sizes = [256,320,384,448,512]
