@@ -112,6 +112,7 @@ class VOC_dataset(data.Dataset):
     def pad_to_square(self,img):
         h,w,_= img.shape
         ts = (max(h,w)//32+1)*32
+        diff1 = abs(h-ts)
         diff2 = abs(w-ts)
         pad = (diff1//2,diff2//2,diff1-diff1//2,diff2-diff2//2)
         img = cv2.copyMakeBorder(img,pad[0],pad[2],pad[1],pad[3],cv2.BORDER_CONSTANT,0)
