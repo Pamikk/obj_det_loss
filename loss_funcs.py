@@ -312,7 +312,7 @@ class YOLOLossv3(nn.Module):
         gt_boxes = gts[:,2:]
         gws = gt_boxes[:,2]
         ghs = gt_boxes[:,3]
-        anchors = torch.tensor(self.anchors,dtype=torch.float,device=self.device).reshape(-1,2)
+        anchors = torch.tensor(self.anchors,dtype=torch.float,device=self.device)
         #calculate bbox ious with anchors
         ious = torch.stack([iou_wo_center(gws,ghs,anchor_w,anchor_h) for (anchor_w,anchor_h) in anchors])
         _, best_n = ious.max(0)

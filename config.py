@@ -14,7 +14,7 @@ class Config:
         #loss args
         self.anchors = [[0.18414403,0.30230376],[0.57590277,0.38793478],[0.7645372,0.79610235],[0.30366338,0.63555215],[0.07356203,0.12814362]] #(w,h),normalized
         self.anchor_num = len(self.anchors)
-        self.obj_scale = 1
+        self.obj_scale = 5
         self.noobj_scale = 0.5
         self.ignore_threshold = 0.5
         self.bs = 1        
