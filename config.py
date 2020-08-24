@@ -4,12 +4,11 @@ class Config:
     def __init__(self,mode='train'):
         #Path Setting
         self.test_img_path='../dataset/VOCdevkit/VOC2007/JPEGImages'
-        self.img_path = '../drive/My Drive/dataset/VOCdevkit/VOC2007/JPEGImages'
-        self.checkpoint='../drive/My Drive/checkpoints'
+        self.img_path = '../dataset/VOCdevkit/VOC2007/JPEGImages'
+        self.checkpoint='../checkpoints'
         self.cls_num = 20        
         self.res = 50
-        self.sizes = [256,320,384,448,512]
-        self.sizes_w = [0.05,0.05,0.05,0.05,0.8] 
+        self.sizes = range(256,513,32)
         self.nms_threshold = 0.5
         self.dc_threshold = 0.4
         #loss args
@@ -26,16 +25,14 @@ class Config:
             #augmentation parameter
             self.rot = 0
             self.crop = 0.2
-            self.flip = True
             self.valid_scale = 0.25
-            self.sigmas =[(1,1),(3,3),(5,5),(9,9)]
             #train_setting
             self.lr = 0.01
             self.weight_decay=5e-4
             self.min_lr = 5e-5
             self.lr_factor = 0.1
             #exp_setting
-            self.save_every_k_epoch = 1
+            self.save_every_k_epoch = 10
 
         elif mode=='val':
             self.file = './pre_data/val.json'

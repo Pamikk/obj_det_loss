@@ -31,6 +31,12 @@ def brightness_scale(src,vs):
     img[:,:,2] *= (1+vs)
     img[:,:,2][img[:,:,2]>255] = 255
     return img
+def rotate(src,ang,labels):
+    h,w,_ = src.shape
+    center =(w/2,h/2)
+    mat = cv2.getRotationMatrix2D(center, ang, 1.0)
+    dst = cv2.warpAffine(src,mat,(w,h))
+    labels = 
 
 def augment(src,ang,vs,flip=False):
     #flip
@@ -47,7 +53,28 @@ def augment(src,ang,vs,flip=False):
 def resize(src,tsize):
     dst = cv2.resize(src,(tsize[1],tsize[0]),interpolation=cv2.INTER_LINEAR)
     return dst    
-
+def rotate(src,ang,labels):
+    h,w,_ = src.shape
+    center =(w/2,h/2)
+    mat = cv2.getRotationMatrix2D(center, ang, 1.0)
+    dst = cv2.warpAffine(src,mat,(w,h))
+    labels_ = labels.clone()
+    xs,ys,ws,hs = labels[:,1:].T
+    n = len(xs)
+    cos = abs(mat[0,0])
+    sin = abs(mat[0,1])
+    pts = np.stack([xs,ys,np.ones([n])],axis=1).T
+    tpts = torch.tensor(np.dot(mat,pts).T,dtype=torch.float)
+    labels_[:,1] = tpts[:,0]
+    labels_[:,2] = tpts[:,1]
+    labels_[:,3] = (cos*ws + sin*hs)
+    labels_[:,4] = (cos*hs + sin*ws)
+    return dst,labels_
+def flip(src,labels):
+    w = src.shape[1]
+    dst = cv2.flip(src,1)
+    labels[:,1] = w-1-labels[:,1]
+    return dst,labels
 def color_normalize(img,mean):
     img = img.astype(np.float)
     if img.max()>1:
@@ -68,7 +95,7 @@ class VOC_dataset(data.Dataset):
 
     def img_to_tensor(self,img):
         data = torch.tensor(np.transpose(img,[2,0,1]),dtype=torch.float)
-        data /= data.max()
+        data /= 255.0
         return data
     def gen_gts(self,anno):
         gts = torch.zeros((anno['obj_num'],5),dtype=torch.float)
@@ -81,33 +108,16 @@ class VOC_dataset(data.Dataset):
             gts[i,1:] =torch.tensor([(x1+x2)/2-1,(y1+y2)/2-1,x2-x1,y2-y1],dtype=torch.float)
         return gts
         
-    def get_trans_gts(self,labels,size,mat=np.eye(3),flip=True,pad=(0,0)):
+    def normalize_gts(self,labels,size):
         #transfer
         if len(labels)== 0:
             return labels
-        cos = abs(mat[0,0])
-        sin = abs(mat[0,1])
-        xs = labels[:,1].clone()+pad[1]
-        ys = labels[:,2].clone()+pad[0]
-        ws = labels[:,3].clone()
-        hs = labels[:,4].clone()
-        if flip:
-            xs = size-1-xs
-        n = len(labels)
-
-        pts = np.stack([xs,ys,np.ones([n])],axis=1).T
-        tpts = torch.tensor(np.dot(mat,pts).T)
-        labels[:,1] = tpts[:,0]
-        labels[:,2] = tpts[:,1]
-        labels[:,3] = (cos*ws + sin*hs)
-        labels[:,4] = (cos*hs + sin*ws)
         labels[:,1:]/=size 
         return labels
 
     def pad_to_square(self,img):
         h,w,_= img.shape
-        ts = (max(h,w)//64+1)*64
-        diff1 = abs(h-ts)
+        ts = (max(h,w)//32+1)*32
         diff2 = abs(w-ts)
         pad = (diff1//2,diff2//2,diff1-diff1//2,diff2-diff2//2)
         img = cv2.copyMakeBorder(img,pad[0],pad[2],pad[1],pad[3],cv2.BORDER_CONSTANT,0)
@@ -122,24 +132,14 @@ class VOC_dataset(data.Dataset):
         h = img.shape[0]
         labels = self.gen_gts(anno)
         if self.mode=='train':
-            if random.uniform(0,1)>=0.25:
-                rot = random.uniform(-1,1)*self.cfg.rot
-            else:
-                rot = 0
-            if random.uniform(0,1)>=0.5:
-                flip = True
-            else:
-                flip = False
-            if random.uniform(0,1)>=0.5:
-                vs = self.cfg.valid_scale*random.uniform(-1,1)
-            else:
-                vs = 0
-            dst,mat = augment(img,rot,vs,flip)
-            labels = self.get_trans_gts(labels,h,mat,flip,pad)#normalize to[0,1]
-            data = self.img_to_tensor(dst)
-            _,h,w = data.shape
+            labels[:,1]+=pad[1]
+            labels[:,2]+=pad[0]
+            if random.randint(0,1)==1:
+                img,labels = flip(img,labels)
+            data = self.img_to_tensor(img)
+            labels = self.normalize_gts(labels,h)
             #labels = self.fill_with_zeros(labels,n)
-            return data,labels,round(w/64)/round(h/64)        
+            return data,labels      
         else:
             #validation set
             data = self.img_to_tensor(img)
@@ -159,7 +159,7 @@ class VOC_dataset(data.Dataset):
             info = stack_dicts(info)
             data = torch.stack(data)
         elif self.mode=='train':
-            data,labels,ratios = list(zip(*batch))
+            data,labels = list(zip(*batch))
             #ratio = random.choice(ratios)
             scale = random.choice(self.cfg.sizes)
             tsize = (scale,scale)
