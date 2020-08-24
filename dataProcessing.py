@@ -31,12 +31,6 @@ def brightness_scale(src,vs):
     img[:,:,2] *= (1+vs)
     img[:,:,2][img[:,:,2]>255] = 255
     return img
-def rotate(src,ang,labels):
-    h,w,_ = src.shape
-    center =(w/2,h/2)
-    mat = cv2.getRotationMatrix2D(center, ang, 1.0)
-    dst = cv2.warpAffine(src,mat,(w,h))
-    labels = 
 
 def augment(src,ang,vs,flip=False):
     #flip
