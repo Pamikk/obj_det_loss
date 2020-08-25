@@ -128,6 +128,7 @@ class Trainer:
             outs = self.net(inputs.to(self.device).float())
             labels = labels.to(self.device).float()
             display,loss = self.loss(outs,labels)
+            exit()
             del inputs,outs,labels
             for k in running_loss:
                 if k in display.keys():
@@ -161,7 +162,7 @@ class Trainer:
             if (epoch+1)%self.save_every_k_epoch==0:
                 self.save_epoch(str(epoch),epoch)
             if (epoch+1)%self.val_every_k_epoch==0:                
-                metrics = self.validate(epoch,'train',self.save_pred)
+                metrics = self.validate(epoch,'val',self.save_pred)
                 self.logger.write_metrics(epoch,metrics,tosave)
                 mAP = metrics['mAP']
                 self._updateMetrics(mAP,epoch)
@@ -170,9 +171,9 @@ class Trainer:
                     self.best_mAP_epoch = epoch
                     self.save_epoch('best',epoch)
                 print("best so far with:",self.best_mAP)
-                ''''if self.trainval:
+                if self.trainval:
                     metrics = self.validate(epoch,'train',self.save_pred)
-                    self.logger.write_metrics(epoch,metrics,tosave,mode='Trainval')'''
+                    self.logger.write_metrics(epoch,metrics,tosave,mode='Trainval')
             epoch +=1
                 
         print("Best mAP: {:.4f} at epoch {}".format(self.best_mAP, self.best_mAP_epoch))

@@ -8,13 +8,14 @@ class Config:
         self.checkpoint='../checkpoints'
         self.cls_num = 20        
         self.res = 50
-        self.sizes = [320,352,400,448,480,496]
-        self.sizes_w = [0.006,0.003,0.004,0.003,0.017,0.5]
+        self.sizes = [256]
+        self.sizes_w = [1]
         self.nms_threshold = 0.5
         self.dc_threshold = 0.1
         #loss args
         #self.anchors = [[0.26533935,0.33382434],[0.66550966,0.56042827],[0.0880948,0.11774004]] #w,h normalized by max size
-        self.anchors = [[0.76822971,0.57259308],[0.39598597,0.47268035],[0.20632625,0.26720238],[0.07779112,0.10330848]] 
+        #self.anchors = [[0.76822971,0.57259308],[0.39598597,0.47268035],[0.20632625,0.26720238],[0.07779112,0.10330848]] 
+        self.anchors = [[0.30184952,0.49619923],[0.18320179,0.23295927],[0.72675921,0.63843793],[0.58477846,0.30150818],[0.07225798,0.09619811]]
         self.anchor_num = len(self.anchors)
         self.obj_scale = 1
         self.noobj_scale = 0.5
@@ -31,8 +32,8 @@ class Config:
             #train_setting
             self.lr = 0.1
             self.weight_decay=5e-4
-            self.min_lr = 5e-5
-            self.lr_factor = 0.1
+            self.min_lr = 1e-3
+            self.lr_factor = 0.25
             #exp_setting
             self.save_every_k_epoch = 10
 

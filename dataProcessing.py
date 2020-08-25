@@ -112,6 +112,7 @@ class VOC_dataset(data.Dataset):
         anno = self.annos[name]
         img = cv2.imread(os.path.join(self.img_path,name+'.jpg'))
         img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
+        print(img.shape)
         img,pad = self.pad_to_square(img)
         h = img.shape[0]
         labels = self.gen_gts(anno)
@@ -125,7 +126,7 @@ class VOC_dataset(data.Dataset):
             return data,labels      
         else:
             #validation set
-            scale = int(round(h/16)*16)
+            scale = 256#int(round(h/16)*16)
             img = resize(img,(scale,scale))
             data = self.img_to_tensor(img)
             info ={'size':h,'img_id':name,'pad':pad}

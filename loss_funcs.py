@@ -212,7 +212,6 @@ class YOLOLossv3(nn.Module):
         #ignore big overlap but not the best
         for i,iou in enumerate(ious.t()):
             noobj_mask[batch[i],iou > self.ignore_thres,gjs[i],gis[i]] = 0
-        
         tbboxes[batch,best_n,gjs,gis,0] = gxs
         tbboxes[batch,best_n,gjs,gis,1]  = gys
         tbboxes[batch,best_n,gjs,gis,2]  = gws
@@ -253,6 +252,8 @@ class YOLOLossv3(nn.Module):
         tys = tbboxes[...,1] - tbboxes[...,1].floor()
         tws = tbboxes[...,2]/self.anchors_w
         ths = tbboxes[...,3]/self.anchors_h
+        print(tbboxes[obj_mask])
+        print(ws[obj_mask],tws[obj_mask],torch.log(tws[obj_mask]))
 
         loss_x = mse_loss(xs[obj_mask],txs[obj_mask])
         loss_y = mse_loss(ys[obj_mask],tys[obj_mask])
