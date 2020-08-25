@@ -128,7 +128,6 @@ class Trainer:
             outs = self.net(inputs.to(self.device).float())
             labels = labels.to(self.device).float()
             display,loss = self.loss(outs,labels)
-            exit()
             del inputs,outs,labels
             for k in running_loss:
                 if k in display.keys():
