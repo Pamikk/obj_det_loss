@@ -300,7 +300,7 @@ def non_maximum_supression(preds,conf_threshold=0.5,nms_threshold = 0.4):
         keep.append(new)
         ious = iou_wt_center(dets[0,:4],dets[:,:4])
         if not(ious[0]>=0.7):
-            ious[0] =1
+            ious[0] = 1
         mask = mask & (ious>nms_threshold)
         #hard-nms        
         dets = dets[~mask]

@@ -67,12 +67,13 @@ def count_overlap(annos):
     for name in annos:
         size = annos[name]['size']
         w,h,_ = size
-        count = np.zeros((32,32))
+        count = np.zeros((16,16))
         for anno in annos[name]['annotation']:
             xmin,ymin,xmax,ymax = anno['bbox']
-            xc = int((xmin+xmax)/2-1)
-            yc = int((ymin+ymax)/2-1)
-            count[int(32*yc/h),int(32*xc/w)]+=1
+            t = max(w,h)
+            xc = ((xmin+xmax)/2-1)/t
+            yc = ((ymin+ymax)/2-1)/t
+            count[int(16*yc),int(16*xc)]+=1
         mc = max(count.max(),mc)
     print(mc)
 def analyze_hw(annos):
@@ -91,7 +92,7 @@ def analyze_hw(annos):
             mxh = max(mxh,bh)
             mw = min(mw,bw)
             mxw = max(mxw,bw)
-    km = kmeans(allb,k=3,max_iters=500)
+    km = kmeans(allb,k=4,max_iters=500)
     km.initialization()
     km.iter(0)  
     print(mh,mw,mxh,mxw)
@@ -110,17 +111,17 @@ def analyze_size(annos):
     for name in annos:
         size = annos[name]['size']
         w,h,_ = size
-        ts = round(w/64)*64/(round(h/64)*64)
+        ts = max(w,h)
         if ts in res.keys():
             res[ts]+=1
         else:
             res[ts] = 1
-        ts = round(max(h,w)/64)*64
+        ts = round(max(h,w)/16)*16
         if ts in res2.keys():
             res2[ts]+= 1/len(annos)
         else:
             res2[ts] = 1/len(annos)
-
+    res2 = {k: v for k, v in sorted(res2.items(), key=lambda item: item[1])}
     print(res)
     print(len(res))
     print(res2)
@@ -129,15 +130,21 @@ def analyze_size(annos):
 path ='annotation.json'
 
 annos = json.load(open(path,'r'))
-analyze_hw(annos)
+analyze_size(annos)
 #img size:
 #96 100 500 500
 #overlap
 #6
-#center overlap 3
+#center overlap 3(32,32)
+#center overlap 4(16,16)
 
 
 #[0.26533935 0.33382434] 10522
 #[0.66550966 0.56042827] 7400
 #[0.0880948  0.11774004] 12716
+
+#[0.76822971 0.57259308] 4912
+#[0.20632625 0.26720238] 8987
+#[0.39598597 0.47268035] 5993
+#[0.07779112 0.10330848] 10746
 

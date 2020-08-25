@@ -32,7 +32,7 @@ class Trainer:
         self.device = cfg.device
         self.net = self.net
         self.optimizer = optim.Adam(self.net.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
-        self.lr_sheudler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,mode='min', factor=cfg.lr_factor, threshold=0.0001,patience=4,min_lr=cfg.min_lr)
+        self.lr_sheudler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,mode='min', factor=cfg.lr_factor, threshold=0.0001,patience=3,min_lr=cfg.min_lr)
         if not(os.path.exists(self.checkpoints)):
             os.mkdir(self.checkpoints)
         self.predictions = os.path.join(self.checkpoints,'pred')
@@ -161,7 +161,7 @@ class Trainer:
             if (epoch+1)%self.save_every_k_epoch==0:
                 self.save_epoch(str(epoch),epoch)
             if (epoch+1)%self.val_every_k_epoch==0:                
-                metrics = self.validate(epoch,'val',self.save_pred)
+                metrics = self.validate(epoch,'train',self.save_pred)
                 self.logger.write_metrics(epoch,metrics,tosave)
                 mAP = metrics['mAP']
                 self._updateMetrics(mAP,epoch)
@@ -170,9 +170,9 @@ class Trainer:
                     self.best_mAP_epoch = epoch
                     self.save_epoch('best',epoch)
                 print("best so far with:",self.best_mAP)
-                if self.trainval:
+                ''''if self.trainval:
                     metrics = self.validate(epoch,'train',self.save_pred)
-                    self.logger.write_metrics(epoch,metrics,tosave,mode='Trainval')
+                    self.logger.write_metrics(epoch,metrics,tosave,mode='Trainval')'''
             epoch +=1
                 
         print("Best mAP: {:.4f} at epoch {}".format(self.best_mAP, self.best_mAP_epoch))
@@ -197,8 +197,6 @@ class Trainer:
                 pds = self.loss(outs,infer=True)
                 nB = pds.shape[0]
                 for b in range(nB):
-                    if labels.shape[0]==0:
-                        break
                     pred = pds[b].view(-1,self.cfg.cls_num+5)
                     gts = labels[labels[:,0]==b,1:]
                     name = info['img_id'][b]
@@ -243,15 +241,14 @@ class Trainer:
                 outs = self.net(inputs.to(self.device).float())
                 pds = self.loss(outs,infer=True)
                 nB = pds.shape[0]
-                pds = pds.view(nB,-1,5)# resize to batch,pd_num,5 
                 for b in range(nB):
-                    pred = pds[b].view(-1,5)
+                    pred = pds[b].view(-1,self.cfg.cls_num+5)
                     name = info['img_id'][b]
                     size = info['size'][b]
                     pad = info['pad'][b]
                     pred[:,:4]*=size
                     pred[:,0] -= pad[1]
-                    pred[:,1] -= pad[0]                
+                    pred[:,1] -= pad[0]                    
                     pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)
                     pds_ = list(pred_nms.cpu().numpy().astype(float))
                     pds_ = [list(pd) for pd in pds_]

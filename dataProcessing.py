@@ -30,20 +30,8 @@ def brightness_scale(src,vs):
     img = cv2.cvtColor(src,cv2.COLOR_RGB2HSV).astype(np.float)
     img[:,:,2] *= (1+vs)
     img[:,:,2][img[:,:,2]>255] = 255
+    img = cv2.cvtColor(img.astype(np.int8),cv2.COLOR_HSV2RGB).astype(np.float)
     return img
-
-def augment(src,ang,vs,flip=False):
-    #flip
-    if flip:
-        dst = cv2.flip(src,1)
-    else:
-        dst = src
-    #rotation
-    h,w,_ = dst.shape
-    center =(w/2,h/2)
-    mat = cv2.getRotationMatrix2D(center, ang, 1.0)
-    dst = cv2.warpAffine(dst,mat,(w,h))  
-    return brightness_scale(dst,vs),mat
 def resize(src,tsize):
     dst = cv2.resize(src,(tsize[1],tsize[0]),interpolation=cv2.INTER_LINEAR)
     return dst    
@@ -89,7 +77,8 @@ class VOC_dataset(data.Dataset):
 
     def img_to_tensor(self,img):
         data = torch.tensor(np.transpose(img,[2,0,1]),dtype=torch.float)
-        data /= 255.0
+        if data.max()>1:
+            data /= 255.0
         return data
     def gen_gts(self,anno):
         gts = torch.zeros((anno['obj_num'],5),dtype=torch.float)
@@ -133,10 +122,11 @@ class VOC_dataset(data.Dataset):
                 img,labels = flip(img,labels)
             data = self.img_to_tensor(img)
             labels = self.normalize_gts(labels,h)
-            #labels = self.fill_with_zeros(labels,n)
             return data,labels      
         else:
             #validation set
+            scale = int(round(h/16)*16)
+            img = resize(img,(scale,scale))
             data = self.img_to_tensor(img)
             info ={'size':h,'img_id':name,'pad':pad}
             if self.mode=='val':
@@ -156,9 +146,9 @@ class VOC_dataset(data.Dataset):
         elif self.mode=='train':
             data,labels = list(zip(*batch))
             #ratio = random.choice(ratios)
-            scale = random.choice(self.cfg.sizes)
+            scale = random.choices(self.cfg.sizes,self.cfg.sizes_w)[0]
             tsize = (scale,scale)
-            data = torch.stack([F.interpolate(img.unsqueeze(0),tsize,mode='bilinear',align_corners=True).squeeze(0) for img in data]) #multi-scale-training   
+            data = torch.stack([F.interpolate(img.unsqueeze(0),tsize,mode='bilinear').squeeze(0) for img in data]) #multi-scale-training   
         tmp =[]
                    
                 
@@ -172,7 +162,7 @@ class VOC_dataset(data.Dataset):
             labels = torch.cat(tmp,dim=0)
             labels = labels.reshape(-1,6)
         else:
-            labels = torch.tensor(tmp,dtype=torch.float)
+            labels = torch.tensor(tmp,dtype=torch.float).reshape(-1,6)
         if self.mode=='train':
             return data,labels
         else:

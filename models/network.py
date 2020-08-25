@@ -70,9 +70,9 @@ class Bottleneck(nn.Module):
 
         return y
 class Networkv2(nn.Module):
-    def __init__(self,res,int_shape,cls_num,pretrained=True):
+    def __init__(self,cfg,pretrained=True):
         super(Networkv2,self).__init__()
-        self.feat = ResNet(res)
+        self.feat = ResNet(cfg.res)
         self.channel = 256
         if pretrained:
             self.feat.load_from_url()

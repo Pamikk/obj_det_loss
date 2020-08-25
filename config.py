@@ -8,13 +8,15 @@ class Config:
         self.checkpoint='../checkpoints'
         self.cls_num = 20        
         self.res = 50
-        self.sizes = [256,448,512]
+        self.sizes = [320,352,400,448,480,496]
+        self.sizes_w = [0.006,0.003,0.004,0.003,0.017,0.5]
         self.nms_threshold = 0.5
-        self.dc_threshold = 0.4
+        self.dc_threshold = 0.1
         #loss args
-        self.anchors = [[0.26533935,0.33382434],[0.66550966,0.56042827],[0.0880948,0.11774004]] #w,h normalized by max size
+        #self.anchors = [[0.26533935,0.33382434],[0.66550966,0.56042827],[0.0880948,0.11774004]] #w,h normalized by max size
+        self.anchors = [[0.76822971,0.57259308],[0.39598597,0.47268035],[0.20632625,0.26720238],[0.07779112,0.10330848]] 
         self.anchor_num = len(self.anchors)
-        self.obj_scale = 5
+        self.obj_scale = 1
         self.noobj_scale = 0.5
         self.ignore_threshold = 0.5
         self.bs = 1        
@@ -27,7 +29,7 @@ class Config:
             self.crop = 0.2
             self.valid_scale = 0.25
             #train_setting
-            self.lr = 0.01
+            self.lr = 0.1
             self.weight_decay=5e-4
             self.min_lr = 5e-5
             self.lr_factor = 0.1
@@ -39,5 +41,5 @@ class Config:
         elif mode=='trainval':
             self.file = './pre_data/trainval.json'
         elif mode=='test':
-            self.file = './pre_data/test.json'
+            self.file = './pre_data/trainval.json'
         
