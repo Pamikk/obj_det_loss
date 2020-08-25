@@ -111,8 +111,7 @@ class VOC_dataset(data.Dataset):
         name = self.imgs[idx]
         anno = self.annos[name]
         img = cv2.imread(os.path.join(self.img_path,name+'.jpg'))
-        img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
-        print(img.shape)
+        img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)d
         img,pad = self.pad_to_square(img)
         h = img.shape[0]
         labels = self.gen_gts(anno)
