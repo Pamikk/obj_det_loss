@@ -85,14 +85,13 @@ def analyze_hw(annos):
         for anno in annos[name]['annotation']:
             xmin,ymin,xmax,ymax = anno['bbox']
             bw,bh = xmax-xmin,ymax-ymin
-            bw /= w
-            bh /= h
-            allb.append((bw,bh))
+            t = max(w,h)
+            allb.append((bw/t,bh/t))
             mh = min(mh,bh)
             mxh = max(mxh,bh)
             mw = min(mw,bw)
             mxw = max(mxw,bw)
-    km = kmeans(allb,k=4,max_iters=500)
+    km = kmeans(allb,k=3,max_iters=500)
     km.initialization()
     km.iter(0)  
     print(mh,mw,mxh,mxw)
@@ -137,18 +136,8 @@ analyze_hw(annos)
 #6
 #center overlap 3
 
-#[0.18414403,0.30230376] 7576
-#[0.57590277,0.38793478] 2893
-#[0.7645372,0.79610235] 4402
-#[0.30366338,0.63555215] 4393
-#[0.07356203,0.12814362] 8931
-#3
-#[0.27498111 0.4368642 ] 10402
-#[0.69948543 0.71518563] 7606
-#[0.09166897 0.15772674] 12630
-#4
-#[0.80560634 0.74450962] 4989
-#[0.20706191 0.36668539] 8746
-#[0.42707654 0.58199079] 6134
-#[0.08251443 0.13787088] 10769
+
+#[0.26533935 0.33382434] 10522
+#[0.66550966 0.56042827] 7400
+#[0.0880948  0.11774004] 12716
 
