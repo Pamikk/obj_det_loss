@@ -247,6 +247,7 @@ def cal_metrics_cls(pd,gt,threshold=0.5):
                 continue
             if pd_bboxes.shape[0]==0:
                 fn += gt_bboxes.shape[0]
+                continue
             ious = iou_wt_center_np(pd_bboxes,gt_bboxes) #nxm
             scores = ious.max(axis=1) 
             fp_ = scores <= threshold

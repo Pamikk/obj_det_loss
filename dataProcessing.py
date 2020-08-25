@@ -111,7 +111,7 @@ class VOC_dataset(data.Dataset):
 
     def pad_to_square(self,img):
         h,w,_= img.shape
-        ts = (max(h,w)//16+1)*16
+        ts = max(h,w)
         diff1 = abs(h-ts)
         diff2 = abs(w-ts)
         pad = (diff1//2,diff2//2,diff1-diff1//2,diff2-diff2//2)
