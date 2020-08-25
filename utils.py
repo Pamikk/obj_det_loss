@@ -281,11 +281,14 @@ def cal_metrics_cls(pd,gt,threshold=0.5):
 
 
     
-def non_maximum_supression(preds,conf_threshold=0.5,nms_threshold = 0.4):      
+def non_maximum_supression(preds,conf_threshold=0.5,nms_threshold = 0.4):
+    preds = preds[preds[:,4]>conf_threshold]
+    if len(preds) == 0:
+        return preds      
     score = preds[:,4]*preds[:,5:].max(1)[0]
     idx = torch.argsort(score,descending=True)
     preds = preds[idx]
-    preds = preds[score[idx] >= conf_threshold]    
+    #preds = preds[score[idx] >= conf_threshold]    
     if len(preds) == 0:
         return preds 
     cls_confs,cls_labels = torch.max(preds[:,5:],dim=1,keepdim=True)
@@ -306,17 +309,17 @@ def non_maximum_supression_soft(preds,conf_threshold=0.5,nms_threshold=0.4):
     keep = []
     cls_confs,cls_labels = torch.max(preds[:,5:],dim=1,keepdim=True)
     dets = torch.cat((preds[:,:5],cls_confs.float(),cls_labels.float()),dim=1)
+    dets = dets[dets[:,4]>conf_threshold]
     while len(dets)>0:
-        val,idx = torch.max(dets[:,4]*dets[:,5],dim=0)
-        if val<conf_threshold:
-            break
+        _,idx = torch.max(dets[:,4]*dets[:,5],dim=0)
+        val = dets[:,4]        
         pd = dets[idx]
         dets = torch.cat((dets[:idx],dets[idx+1:]))
         ious = iou_wt_center(pd[:4],dets[:,:4])
         mask = (ious>nms_threshold) & (pd[-1]==dets[:,-1])
-        #hard-nms
         keep.append(pd)
         dets[mask,4] *= (1-ious[mask])*(1-val)
+        dets = dets[dets[:,4]>conf_threshold]
     print(len(keep))
     return torch.stack(keep)
 def visualization():
