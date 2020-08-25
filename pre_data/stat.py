@@ -66,11 +66,13 @@ def count_overlap(annos):
     mc = 0
     for name in annos:
         size = annos[name]['size']
-        count = np.zeros(size)
+        w,h,_ = size
+        count = np.zeros((32,32))
         for anno in annos[name]['annotation']:
             xmin,ymin,xmax,ymax = anno['bbox']
-            xmin,ymin,xmax,ymax = int(xmin-1),int(ymin-1),int(xmax-1),int(ymax-1)
-            count[ymin:ymax,xmin:xmax]+=1
+            xc = int((xmin+xmax)/2-1)
+            yc = int((ymin+ymax)/2-1)
+            count[int(32*yc/h),int(32*xc/w)]+=1
         mc = max(count.max(),mc)
     print(mc)
 def analyze_hw(annos):
@@ -90,7 +92,7 @@ def analyze_hw(annos):
             mxh = max(mxh,bh)
             mw = min(mw,bw)
             mxw = max(mxw,bw)
-    km = kmeans(allb,k=5,max_iters=500)
+    km = kmeans(allb,k=4,max_iters=500)
     km.initialization()
     km.iter(0)  
     print(mh,mw,mxh,mxw)
@@ -124,17 +126,29 @@ def analyze_size(annos):
     print(len(res))
     print(res2)
     print(len(res2))
+
 path ='annotation.json'
 
 annos = json.load(open(path,'r'))
-analyze_size(annos)
+analyze_hw(annos)
 #img size:
 #96 100 500 500
 #overlap
 #6
+#center overlap 3
+
 #[0.18414403,0.30230376] 7576
 #[0.57590277,0.38793478] 2893
 #[0.7645372,0.79610235] 4402
 #[0.30366338,0.63555215] 4393
 #[0.07356203,0.12814362] 8931
+#3
+#[0.27498111 0.4368642 ] 10402
+#[0.69948543 0.71518563] 7606
+#[0.09166897 0.15772674] 12630
+#4
+#[0.80560634 0.74450962] 4989
+#[0.20706191 0.36668539] 8746
+#[0.42707654 0.58199079] 6134
+#[0.08251443 0.13787088] 10769
 

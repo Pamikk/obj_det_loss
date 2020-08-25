@@ -8,11 +8,12 @@ class Config:
         self.checkpoint='../checkpoints'
         self.cls_num = 20        
         self.res = 50
-        self.sizes = range(256,513,32)
+        self.sizes = range(256,513,16)
         self.nms_threshold = 0.5
         self.dc_threshold = 0.4
         #loss args
-        self.anchors = [[0.18414403,0.30230376],[0.57590277,0.38793478],[0.7645372,0.79610235],[0.30366338,0.63555215],[0.07356203,0.12814362]] #(w,h),normalized
+        #self.anchors = [[0.18414403,0.30230376],[0.57590277,0.38793478],[0.7645372,0.79610235],[0.30366338,0.63555215],[0.07356203,0.12814362]] #(w,h),normalized
+        self.anchors = [[0.27498111,0.4368642 ],[0.69948543,0.71518563],[0.09166897,0.15772674]]
         self.anchor_num = len(self.anchors)
         self.obj_scale = 5
         self.noobj_scale = 0.5

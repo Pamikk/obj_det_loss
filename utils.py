@@ -36,7 +36,6 @@ class Logger(object):
                 tmp +=str(metrics[k])+'\t'
             if log:
                 tag = mode+'/'+k            
-                print(tag)
                 self.writer.add_scalar(tag,metrics[k],epoch)
                 #self.writer.flush()
             print(k,':',metrics[k])
@@ -220,6 +219,54 @@ def cal_metrics_wo_cls(pd,gt,threshold=0.5):
         # groud truth with no associated predicted object
         assert (fp+tp)==n
         fn = m-tp
+        p = tp/n
+        r = tp/m
+        assert(p<=1)
+        assert(r<=1)
+        ap = tp/(fp+fn+tp)
+        return p,r,ap
+    elif m>0 or n >0 :
+        return 0,0,0
+    else:
+        return 1,1,1
+def cal_metrics_cls(pd,gt,threshold=0.5):
+    pd = pd.cpu().numpy()#n
+    gt = gt.cpu().numpy()#m
+    m = len(gt)
+    n = len(pd)
+    cls_num = len(voc_classes)-1
+    if n>0 and m>0:
+        fp = 0
+        fn = 0
+        tp = 0
+        for i in range(cls_num):
+            gt_bboxes = gt[gt[:,0]==i,1:]
+            pd_bboxes = pd[pd[:,-1]==i,:4]
+            if gt_bboxes.shape[0]==0:
+                fp += pd_bboxes.shape[0]
+                continue
+            if pd_bboxes.shape[0]==0:
+                fn += gt_bboxes.shape[0]
+            ious = iou_wt_center_np(pd_bboxes,gt_bboxes) #nxm
+            scores = ious.max(axis=1) 
+            fp_ = scores <= threshold
+
+            #only keep trues
+            ious = ious[~fp_,:]
+            fp += fp_.sum() # transfer to scalar
+
+
+            select_ids = ious.argmax(axis=1)
+            #discard fps hit gt boxes has been hitted by bboxes with higher conf
+            tp_ = len(np.unique(select_ids))
+            fp += len(select_ids) - tp_
+            tp += tp_
+            fn += gt_bboxes.shape[0]-tp_
+
+        
+        # groud truth with no associated predicted object
+        assert (fp+tp)==n
+        assert (fn+tp)==m
         p = tp/n
         r = tp/m
         assert(p<=1)
