@@ -48,7 +48,7 @@ class Trainer:
         self.logger = Logger(log_dir)
         torch.cuda.empty_cache()
         self.save_every_k_epoch = cfg.save_every_k_epoch #-1 for not save and validate
-        self.val_every_k_epoch = 5
+        self.val_every_k_epoch = 1
         self.upadte_grad_every_k_batch = 1
 
         self.best_mAP = 0

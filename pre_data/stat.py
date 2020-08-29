@@ -28,8 +28,8 @@ class kmeans(object):
         #1-iou
         obj1 = obj1.reshape(-1,2)
         obj2 = obj2.reshape(-1,2)
-        inter = np.minimum(obj1[:,0].reshape(-1,1),obj2[:,0].reshape(1,-1))*np.minimum(obj1[:,1].reshape(-1,1),obj2[:,1].reshape(1,-1))
-        union = (obj1[:,0]*obj1[:,1]).reshape(-1,1) + (obj2[:,0]*obj2[:,1]).reshape(1,-1) - inter +1e-16
+        inter = np.minimum(obj1[:,0],obj2[:,0])*np.minimum(obj1[:,1],obj2[:,1])
+        union = (obj1[:,0]*obj1[:,1]) + (obj2[:,0]*obj2[:,1]) - inter
         return 1-inter/union
     def update_assign(self):
         self.terminate = True
@@ -37,9 +37,12 @@ class kmeans(object):
         for i in range(self.num):
             val = self.vals[i]
             tmp = self.cal_distance(val,np.stack(centers,axis=0))
-            id = np.argmin(tmp)
-            if id != self.assign[i]:
-                self.assign[i] = id
+            if tmp.shape[0]!=self.k:
+                print(tmp.shape)
+            assert tmp.shape[0]==self.k
+            idx = np.argmin(tmp)
+            if idx != self.assign[i]:
+                self.assign[i] = idx
                 self.terminate= False
     def iter(self,num):
         self.update_center()
@@ -56,12 +59,38 @@ class kmeans(object):
                 return self.iter(num+1)
     def print_cs(self):
         for i in range(self.k):
-            print(self.centers[i],np.sum(self.assign==i))
-        print(self.cal_distance(self.centers,self.centers))
-    def write2json(self,name):
-        #assign = [[int(self.assign[i]),self.vals[i]] for i in range(self.num)]
-        centers = list([[self.centers[i],np.sum(self.assign==i)] for i in range(self.k)])
-        #json.dump(centers,open(name,'w'))
+            print(list(self.centers[i]),np.sum(self.assign==i))
+    def get_cluster(self,idx):
+        assert idx < self.k
+        return self.vals[self.assign==idx]
+class kmeans_mse(kmeans):
+    def cal_distance(self,obj1,obj2):
+        dis = ((obj2.max(1)-obj1.max())**2).reshape(self.k,-1).sum(1)
+        return dis
+    def print_cs(self):
+        for i in range(self.k):
+            print(self.centers[i,0],np.sum(self.assign==i))
+def anaylze_scale_and_ratio(annos):
+    allb = []
+    for name in annos:
+        size = annos[name]['size']
+        w,h,_ = size
+        for anno in annos[name]['annotation']:
+            xmin,ymin,xmax,ymax = anno['bbox']
+            bw,bh = xmax-xmin,ymax-ymin
+            t = max(w,h)
+            allb.append((bw/t,bh/t))
+    scale_km = kmeans_mse(allb,k=3)
+    scale_km.initialization()
+    _ = scale_km.iter(0)
+    for i in range(3):
+        print(scale_km.centers[i][0])
+        ratio_km = kmeans(scale_km.get_cluster(i))
+        ratio_km.initialization()
+        _ = ratio_km.iter(0)
+        print("------------------")
+
+
 def count_overlap(annos):
     mc = 0
     for name in annos:
@@ -78,7 +107,7 @@ def count_overlap(annos):
     print(mc)
 def analyze_hw(annos):
     allb = []
-    mh,mw = 1,1
+    mh,mw = 1000,1000
     mxh,mxw = 0,0
     for name in annos:
         size = annos[name]['size']
@@ -92,9 +121,9 @@ def analyze_hw(annos):
             mxh = max(mxh,bh)
             mw = min(mw,bw)
             mxw = max(mxw,bw)
-    km = kmeans(allb,k=5,max_iters=500)
+    km = kmeans(allb,k=9,max_iters=500)
     km.initialization()
-    km.iter(0)  
+    #km.iter(0)  
     print(mh,mw,mxh,mxw)
 def analyze_xy(annos):
     for name in annos:
@@ -138,19 +167,16 @@ analyze_hw(annos)
 #center overlap 3(32,32)
 #center overlap 4(16,16)
 
+anchors = [[0.06240989370204694, 0.08104391573725227],[0.1361543202763129, 0.1849733680671929],[0.19089410183808814, 0.4009908394094018],
+                        [0.330588108048818, 0.4824511285878233],[0.36255652253792553, 0.2251556227577435],[0.4910133431007534, 0.5882298825023311],
+                        [0.7663732637284849, 0.2674877832600824],[0.7942536132850522, 0.4810654070974923],[0.8042562250826016, 0.7227642900426251]]
 
-#[0.26533935 0.33382434] 10522
-#[0.66550966 0.56042827] 7400
-#[0.0880948  0.11774004] 12716
+anchors = [[0.04567562487013612, 0.04877678367694419],[0.05375224461038032, 0.1059101288678919],[0.11058225513969774, 0.10200835243357394],
+           [0.10076982326958268, 0.2249563017204674],[0.2121497224480688, 0.13739235134470734],[0.24658122819809095, 0.28345137753563066],
+           [0.2776735214228935, 0.5156163097364138],[0.5879051949772124, 0.30330341110779224],[0.7211957658355485, 0.6396188510155153]
+]
 
-#[0.76822971 0.57259308] 4912
-#[0.20632625 0.26720238] 8987
-#[0.39598597 0.47268035] 5993
-#[0.07779112 0.10330848] 10746
-
-#[0.30184952 0.49619923] 4951
-#[0.18320179 0.23295927] 8368
-#[0.72675921 0.63843793] 4495
-#[0.58477846 0.30150818] 3153
-#[0.07225798 0.09619811] 9671
-
+anchors = [[0.053458141269278926, 0.07862022420023637],[0.1444091477545787, 0.11565781451235851],[0.1151994735538117, 0.24522582628542158],
+           [0.31460831063222794, 0.2242885185476659],[0.21583068081593598, 0.4268351012487999],[0.38056995625914797, 0.5435495510304343],
+           [0.6648272903930105, 0.3314712916726237],[0.5931101292049206, 0.7206548935846065],[0.8799995870003063, 0.5926446052236977]
+]

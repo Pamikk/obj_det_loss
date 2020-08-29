@@ -12,7 +12,7 @@ voc_classes= {'__background__':0, 'aeroplane':1, 'bicycle':2,
             'sheep':17, 'sofa':18, 'train':19, 'tvmonitor':20}
 class Logger(object):
     def __init__(self,log_dir):
-        self.writer = SummaryWriter(log_dir)
+        self.log_dir = log_dir
         self.files = {'val':open(os.path.join(log_dir,'val.txt'),'a+'),'train':open(os.path.join(log_dir,'train.txt'),'a+')}
     def write_line2file(self,mode,string):
         self.files[mode].write(string+'\n')
@@ -20,27 +20,31 @@ class Logger(object):
     def write_loss(self,epoch,losses,lr):
         tmp = str(epoch)+'\t'+str(lr)+'\t'
         print('Epoch',':',epoch,'-',lr)
-        self.writer.add_scalar('lr',math.log(lr),epoch)
+        writer = SummaryWriter(log_dir=self.log_dir)
+        writer.add_scalar('lr',math.log(lr),epoch)
         for k in losses:
             if losses[k]>0:            
-                self.writer.add_scalar('Train/'+k,losses[k],epoch)            
+                writer.add_scalar('Train/'+k,losses[k],epoch)            
                 print(k,':',losses[k])
                 #self.writer.flush()
         tmp+= str(round(losses['all'],5))+'\t'
         self.write_line2file('train',tmp)
+        writer.close()
     def write_metrics(self,epoch,metrics,save=[],mode='Val',log=True):
         tmp =str(epoch)+'\t'
         print("validation epoch:",epoch)
+        writer = SummaryWriter(log_dir=self.log_dir)
         for k in metrics:
             if k in save:
                 tmp +=str(metrics[k])+'\t'
             if log:
                 tag = mode+'/'+k            
-                self.writer.add_scalar(tag,metrics[k],epoch)
+                writer.add_scalar(tag,metrics[k],epoch)
                 #self.writer.flush()
             print(k,':',metrics[k])
         
         self.write_line2file('val',tmp)
+        writer.close()
 
 def iou_wo_center(w1,h1,w2,h2):
     #only for torch, return a vector nx1
@@ -322,10 +326,6 @@ def non_maximum_supression_soft(preds,conf_threshold=0.5,nms_threshold=0.4):
         dets = dets[dets[:,4]>conf_threshold]
     print(len(keep))
     return torch.stack(keep)
-def visualization():
-    pass
-def test_pds():
-    pass
 
 
 
