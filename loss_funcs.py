@@ -125,7 +125,7 @@ class YOLOLossv3(nn.Module):
             #normalize to [0,1]
             pd_bboxes[...,[0,2]]/=self.grid_size[1]
             pd_bboxes[...,[1,3]]/=self.grid_size[0]            
-            return torch.cat(pd_bboxes.view(nb,-1,4),conf.view(nb,-1,1),cls_score.view(nb,-1,self.cls_num),dim=-1)
+            return torch.cat((pd_bboxes.view(nb,-1,4),conf.view(nb,-1,1),cls_score.view(nb,-1,self.cls_num)),dim=-1)
         else:
             pds_bbox = (xs,ys,ws,hs,pd_bboxes)
             obj_mask,noobj_mask,tbboxes,tcls,tconf = self.build_target(pd_bboxes,gts)
