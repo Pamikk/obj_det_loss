@@ -8,7 +8,7 @@ class Config:
         self.checkpoint='../checkpoints'
         self.cls_num = 20        
         self.res = 50
-        self.sizes = [256]
+        self.sizes = [416]
         self.sizes_w = [1]
         self.nms_threshold = 0.5
         self.dc_threshold = 0.1

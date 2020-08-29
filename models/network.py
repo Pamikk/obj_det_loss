@@ -68,8 +68,9 @@ class YOLO(nn.Module):
             outs.append(out)
             y = [feats.pop(0)]
         return outs
-class YOLO_SPP(nn.Module):
+class YOLO_SPP(YOLO):
     def __init__(self,cfg):
+        super(YOLO_SPP,self).__init__(cfg)
         self.encoders = Darknet()
         self.out_channels = self.encoders.out_channels
         self.in_channel = self.out_channels.pop(0)
@@ -80,7 +81,7 @@ class YOLO_SPP(nn.Module):
         self.conv1 = nn.Sequential(NonResidual(self.in_channel,channel),
                                    conv1x1(channel*NonResidual.multiple,channel),nn.BatchNorm2d(channel),self.relu)
         pool_size = [1,5,9,13]
-        self.pools = nn.ModuleList([nn.MaxPool2d(kernel_size=ks,stride=1) for ks in pool_size])
+        self.pools = nn.ModuleList([nn.MaxPool2d(kernel_size=ks,stride=1,padding=(ks-1) // 2) for ks in pool_size])
         self.in_channel = channel * 4
         for i,ind in enumerate(cfg.anchor_divide):
             if i==0:
