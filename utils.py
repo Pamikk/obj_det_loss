@@ -78,9 +78,9 @@ def gou(bbox1,bbox2):
     inter_h = inter_ymax-inter_ymin
     mask = ((inter_w>=0 )&( inter_h >=0)).to(torch.float)
     # detect not overlap
-    cover = (cover_xmax-cover_xmin)*(cover_ymax-cover_ymin)
+    cover = (cover_xmax-cover_xmin)*(cover_ymax-cover_ymin)+1e-16
     #inter_h[inter_h<0] = 0
-    inter = inter_w*inter_h*mask
+    inter = inter_w*inter_h*mask+1e-16
     #keep iou<0 to avoid gradient diasppear
     area1 = bbox1[:,2]*bbox1[:,3]
     area2 = bbox2[:,2]*bbox2[:,3]

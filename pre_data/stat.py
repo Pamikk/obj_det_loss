@@ -3,6 +3,7 @@ import numpy as np
 class kmeans(object):
     def __init__(self,vals,k=3,max_iters=200):
         self.vals = np.array(vals)
+        np.random.shuffle(self.vals)
         print(self.vals.shape)
         self.dim = self.vals.shape[-1]
         self.k = k
@@ -28,8 +29,8 @@ class kmeans(object):
         #1-iou
         obj1 = obj1.reshape(-1,2)
         obj2 = obj2.reshape(-1,2)
-        inter = np.minimum(obj1[:,0],obj2[:,0])*np.minimum(obj1[:,1],obj2[:,1])
-        union = (obj1[:,0]*obj1[:,1]) + (obj2[:,0]*obj2[:,1]) - inter
+        inter = np.minimum(obj1[:,0].reshape(1,-1),obj2[:,0].reshape(-1,1))*np.minimum(obj1[:,1].reshape(1,-1),obj2[:,1].reshape(-1,1))
+        union = (obj1[:,0]*obj1[:,1]).reshape(1,-1) + (obj2[:,0]*obj2[:,1]).reshape(-1,1) - inter
         return 1-inter/union
     def update_assign(self):
         self.terminate = True
@@ -60,6 +61,7 @@ class kmeans(object):
     def print_cs(self):
         for i in range(self.k):
             print(list(self.centers[i]),np.sum(self.assign==i))
+        print(self.cal_distance(self.centers,self.centers))
     def get_cluster(self,idx):
         assert idx < self.k
         return self.vals[self.assign==idx]
@@ -123,7 +125,7 @@ def analyze_hw(annos):
             mxw = max(mxw,bw)
     km = kmeans(allb,k=9,max_iters=500)
     km.initialization()
-    #km.iter(0)  
+    km.iter(0)  
     print(mh,mw,mxh,mxw)
 def analyze_xy(annos):
     for name in annos:
@@ -180,3 +182,6 @@ anchors = [[0.053458141269278926, 0.07862022420023637],[0.1444091477545787, 0.11
            [0.31460831063222794, 0.2242885185476659],[0.21583068081593598, 0.4268351012487999],[0.38056995625914797, 0.5435495510304343],
            [0.6648272903930105, 0.3314712916726237],[0.5931101292049206, 0.7206548935846065],[0.8799995870003063, 0.5926446052236977]
 ]
+anchors = [[26.619310998735777, 39.15455120101138],[71.77704517704518, 57.77313797313797],[57.81336725254394, 122.58395004625346],
+           [156.65975718092983, 111.81196328101865],[107.69161406672679, 212.91523895401264],[190.1323076923077, 270.1545299145299],
+           [329.9393296563428, 164.39669070852779],[296.2381738173817, 358.98624862486247],[438.50071873502634, 293.79731672256827]]

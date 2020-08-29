@@ -64,6 +64,7 @@ class YOLOLossv3(nn.Module):
     def build_target(self,pds,gts):
         self.device ='cuda' if pds.is_cuda else 'cpu'
         nB,nA,nH,nW,_ = pds.shape
+        assert nH==nW
         nC = self.cls_num
         #threshold = th
         nGts = len(gts)
@@ -75,31 +76,34 @@ class YOLOLossv3(nn.Module):
             return obj_mask,noobj_mask,tbboxes,tcls,obj_mask.float()
         #convert target
         gt_boxes = gts[:,2:]
-        gws = gt_boxes[:,2]
-        ghs = gt_boxes[:,3]
-        anchors = torch.tensor(self.anchors,dtype=torch.float,device=self.device)
-        #calculate bbox ious with anchors
-        ious = torch.stack([iou_wo_center(gws,ghs,anchor_w,anchor_h) for (anchor_w,anchor_h) in anchors])
-        _, best_n = ious.max(0)
-
+        gws = gt_boxes[:,2]*nW
+        ghs = gt_boxes[:,3]*nH
         batch = gts[:,0].long()
         gt_labels = gts[:,1].long()
-        gxs,gys = gt_boxes[:,0],gt_boxes[:,1]
-        gis,gjs = (nW*gxs).long(),(nH*gys).long()
+        gxs,gys = gt_boxes[:,0]*nW,gt_boxes[:,1]*nH
+        gis,gjs = gxs.long(),gys.long()
+        anchors = zip(self.scaled_anchors_w.squeeze(),self.scaled_anchors_h.squeeze())
+        #calculate bbox ious with anchors
+        ious = torch.stack([iou_wo_center(gws,ghs,w,h) for (w,h) in anchors])
+        _, best_n = ious.max(0)
+
+        
         obj_mask[batch,best_n,gjs,gis] = 1
         noobj_mask[batch,best_n,gjs,gis] = 0
         #ignore big overlap but not the best
         for i,iou in enumerate(ious.t()):
             noobj_mask[batch[i],iou > self.ignore_thres,gjs[i],gis[i]] = 0
         tbboxes[batch,best_n,gjs,gis,0] = gxs
-        tbboxes[batch,best_n,gjs,gis,1]  = gys
-        tbboxes[batch,best_n,gjs,gis,2]  = gws
-        tbboxes[batch,best_n,gjs,gis,3]  = ghs
+        tbboxes[batch,best_n,gjs,gis,1] = gys
+        tbboxes[batch,best_n,gjs,gis,2] = gws
+        tbboxes[batch,best_n,gjs,gis,3] = ghs
+        assert gws.min()>0
+        assert ghs.min()>0
 
         tcls[batch,best_n,gjs,gis,gt_labels] = 1
         return obj_mask,noobj_mask,tbboxes,tcls,obj_mask.float()
     
-    def get_pds_and_targets(self,pred,grid_size,infer=False,gts=None):
+    def get_pds_and_targets(self,pred,infer=False,gts=None):
         xs = torch.sigmoid(pred[...,0])#dxs
         ys = torch.sigmoid(pred[...,1])#dys
         ws = pred[...,2]
@@ -107,16 +111,21 @@ class YOLOLossv3(nn.Module):
         conf = torch.sigmoid(pred[...,4])#Object score
         cls_score = torch.sigmoid(pred[...,5:])
         #grid,anchors
-        grid_x,grid_y = make_grid_mesh_xy(grid_size,self.device)
+        grid_x,grid_y = make_grid_mesh_xy(self.grid_size,self.device)
+        self.scaled_anchors_w = self.anchors_w/self.stride[1]
+        self.scaled_anchors_h = self.anchors_h/self.stride[0]
 
         pd_bboxes = torch.zeros_like(pred[...,:4],dtype=torch.float,device=self.device)
-        pd_bboxes[...,0] = (xs + grid_x)/grid_size[1]
-        pd_bboxes[...,1] = (ys + grid_y)/grid_size[0]
-        pd_bboxes[...,2] = torch.exp(ws)*self.anchors_w
-        pd_bboxes[...,3] = torch.exp(hs)*self.anchors_h
+        pd_bboxes[...,0] = xs + grid_x
+        pd_bboxes[...,1] = ys + grid_y
+        pd_bboxes[...,2] = torch.exp(ws)*self.scaled_anchors_w
+        pd_bboxes[...,3] = torch.exp(hs)*self.scaled_anchors_h
         nb = pred.shape[0]        
         if infer:
-            return torch.cat((pd_bboxes.view(nb,-1,4),conf.view(nb,-1,1),cls_score.view(nb,-1,self.cls_num)),dim=-1)
+            #normalize to [0,1]
+            pd_bboxes[...,[0,2]]/=self.grid_size[1]
+            pd_bboxes[...,[1,3]]/=self.grid_size[0]            
+            return torch.cat(pd_bboxes.view(nb,-1,4),conf.view(nb,-1,1),cls_score.view(nb,-1,self.cls_num),dim=-1)
         else:
             pds_bbox = (xs,ys,ws,hs,pd_bboxes)
             obj_mask,noobj_mask,tbboxes,tcls,tconf = self.build_target(pd_bboxes,gts)
@@ -124,23 +133,22 @@ class YOLOLossv3(nn.Module):
             return (pds_bbox,conf,cls_score),obj_mask,tbboxes,tobj,tcls
     
     def cal_bbox_loss(self,pds,tbboxes,obj_mask,res):
-        xs,ys,ws,hs,_ = pds
-        tbboxes[...,0] *= self.grid_size[1]
-        tbboxes[...,1] *= self.grid_size[0]
+        xs,ys,ws,hs,pd_bboxes = pds
         txs = tbboxes[...,0] - tbboxes[...,0].floor()
         tys = tbboxes[...,1] - tbboxes[...,1].floor()
-        tws = tbboxes[...,2]/self.anchors_w
-        ths = tbboxes[...,3]/self.anchors_h
-
+        tws = tbboxes[...,2]/self.scaled_anchors_w
+        ths = tbboxes[...,3]/self.scaled_anchors_h
         loss_x = mse_loss(xs[obj_mask],txs[obj_mask])
         loss_y = mse_loss(ys[obj_mask],tys[obj_mask])
         loss_xy = loss_x + loss_y
-        loss_w = mse_loss(ws[obj_mask],torch.log(tws[obj_mask]))
-        loss_h = mse_loss(hs[obj_mask],torch.log(ths[obj_mask]))
+        loss_w = mse_loss(ws[obj_mask],torch.log(tws[obj_mask]+ 1e-16))
+        loss_h = mse_loss(hs[obj_mask],torch.log(ths[obj_mask]+ 1e-16))
         loss_wh = loss_w + loss_h
-        res['wh']=loss_wh.item()
-        res['xy']=loss_xy.item()
-        return loss_wh+loss_xy,res
+        #res['wh']=loss_wh.item()
+        #res['xy']=loss_xy.item()
+        loss_bbox = loss_xy+loss_wh #mse_loss(pd_bboxes[obj_mask],tbboxes[obj_mask])
+
+        return loss_bbox,res
     
     def cal_cls_loss(self,pds,target,obj_mask,res):
         loss_cls = bce_loss(pds[obj_mask],target[obj_mask])
@@ -157,18 +165,18 @@ class YOLOLossv3(nn.Module):
         res['conf'] = loss_conf.item()
         return loss_conf,res
     
-    def forward(self,out,gts=None,infer=False):
+    def forward(self,out,gts=None,size=None,infer=False):
         nb,_,nh,nw = out.shape
         self.device ='cuda' if out.is_cuda else 'cpu'
         self.grid_size = (nh,nw)
-        grid_size = (nh,nw)
+        self.stride = (size[0]//nh,size[1]//nw)
         pred = out.view(nb,self.num_anchors,self.cls_num+5,nh,nw).permute(0,1,3,4,2).contiguous()
         #reshape to nB,nA,nH,nW,bboxes       
 
         if infer:
-            return self.get_pds_and_targets(pred,grid_size,infer,gts)
+            return self.get_pds_and_targets(pred,infer,gts)
         else:
-            pds,obj_mask,tbboxes,tobj,tcls = self.get_pds_and_targets(pred,grid_size,infer,gts)
+            pds,obj_mask,tbboxes,tobj,tcls = self.get_pds_and_targets(pred,infer,gts)
         pds_bbox,pds_obj,pds_cls = pds        
         loss_reg,res = self.cal_bbox_loss(pds_bbox,tbboxes,obj_mask,{})
         loss_obj,res = self.cal_obj_loss(pds_obj,tobj,obj_mask,res)
@@ -205,18 +213,20 @@ class YOLOLossv3_gou(YOLOLossv3):
 class YOLOLossv3_com(YOLOLossv3):
     def cal_bbox_loss(self,pds,tbboxes,obj_mask,res):
         xs,ys,ws,hs,pd_bboxes = pds
-        tbboxes[...,0] *= self.grid_size[1]
-        tbboxes[...,1] *= self.grid_size[0]
         txs = tbboxes[...,0] - tbboxes[...,0].floor()
         tys = tbboxes[...,1] - tbboxes[...,1].floor()
-        tws = tbboxes[...,2]/self.anchors_w
-        ths = tbboxes[...,3]/self.anchors_h
+        tws = tbboxes[...,2]/self.scaled_anchors_w
+        ths = tbboxes[...,3]/self.scaled_anchors_h
 
         loss_x = mse_loss(xs[obj_mask],txs[obj_mask])
         loss_y = mse_loss(ys[obj_mask],tys[obj_mask])
         loss_xy = loss_x + loss_y
         loss_w = mse_loss(ws[obj_mask],torch.log(tws[obj_mask]))
         loss_h = mse_loss(hs[obj_mask],torch.log(ths[obj_mask]))
+        print('min',tws[obj_mask].min().item(),ths[obj_mask].min().item())
+        print(ws[obj_mask].max(),hs[obj_mask].max(),obj_mask.float().max())
+        if torch.isnan(ws[obj_mask].max()):
+            exit()
         loss_wh = loss_w + loss_h
         res['wh']=loss_wh.item()
         res['xy']=loss_xy.item()
@@ -227,6 +237,8 @@ class YOLOLossv3_com(YOLOLossv3):
         else:
             loss_iou = torch.tensor(0.0,dtype=torch.float,device=self.device)
             loss_gou = torch.tensor(0.0,dtype=torch.float,device=self.device)
+        print(loss_iou.item(),loss_wh.item())
+        print('+++++++++++++++++++++++++++++++++')
         res['iou'] = loss_iou.item()
         res['gou'] = loss_gou.item()
         return loss_gou+loss_wh+loss_xy,res
@@ -252,21 +264,22 @@ class LossAPI(nn.Module):
         for i,ind in enumerate(cfg.anchor_divide):
             cfg.anchor_ind = ind
             self.bbox_losses[i] = Losses[loss](cfg)
-    def forward(self,outs,gt=None,infer=False):
+    def forward(self,outs,gt=None,size=None,infer=False):
         if infer:
             res = []
             for out,loss in zip(outs,self.bbox_losses):
-                result = loss(out,infer=True)
+                result = loss(out,gt,size,infer=True)
                 res.append(result)
             return torch.cat(res,dim=1)
         else:
             res ={'xy':0.0,'wh':0.0,'conf':0.0,'cls':0.0,'obj':0.0,'all':0.0,'iou':0.0,'gou':0.0}
             totals = []
             for out,loss in zip(outs,self.bbox_losses): 
-               ret,total = loss(out,gt)
+               ret,total = loss(out,gt,size)
                for k in ret:
                    res[k] +=ret[k]/len(self.bbox_losses)
                totals.append(total)
+               print(total.item())
             return res,torch.stack(totals).mean()
 
 
