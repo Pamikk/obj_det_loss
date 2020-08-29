@@ -3,9 +3,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .backbone import ResNet,conv1x1,conv3x3,Darknet 
+def init_weights(m):
+    if type(m) == nn.Conv2d:
+        torch.nn.init.kaiming_uniform_(m.weight)
+        if type(m.bias)==type(m.weight):
+            torch.nn.init.constant_(m.bias,0.01)
 def NetAPI(cfg,net):
     networks = {'yolo':YOLO,'yolo_spp':YOLO_SPP}
-    return networks[net](cfg)
+    network = networks[net](cfg)
+    network.apply(init_weights)
+    return network
 
 class NonResidual(nn.Module):
     multiple=2

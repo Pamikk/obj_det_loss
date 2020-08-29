@@ -107,7 +107,7 @@ class YOLOLossv3(nn.Module):
         xs = torch.sigmoid(pred[...,0])#dxs
         ys = torch.sigmoid(pred[...,1])#dys
         ws = pred[...,2]
-        hs = pred[...,3]
+        hs = pred[...,3] # modified to avoid unknown nan in gou loss
         conf = torch.sigmoid(pred[...,4])#Object score
         cls_score = torch.sigmoid(pred[...,5:])
         #grid,anchors
@@ -133,7 +133,7 @@ class YOLOLossv3(nn.Module):
             return (pds_bbox,conf,cls_score),obj_mask,tbboxes,tobj,tcls
     
     def cal_bbox_loss(self,pds,tbboxes,obj_mask,res):
-        xs,ys,ws,hs,pd_bboxes = pds
+        xs,ys,ws,hs,_= pds
         txs = tbboxes[...,0] - tbboxes[...,0].floor()
         tys = tbboxes[...,1] - tbboxes[...,1].floor()
         tws = tbboxes[...,2]/self.scaled_anchors_w
@@ -141,13 +141,14 @@ class YOLOLossv3(nn.Module):
         loss_x = mse_loss(xs[obj_mask],txs[obj_mask])
         loss_y = mse_loss(ys[obj_mask],tys[obj_mask])
         loss_xy = loss_x + loss_y
-        loss_w = mse_loss(ws[obj_mask],torch.log(tws[obj_mask]+ 1e-16))
-        loss_h = mse_loss(hs[obj_mask],torch.log(ths[obj_mask]+ 1e-16))
+        loss_w = mse_loss(ws[obj_mask],torch.log(tws[obj_mask]))
+        loss_h = mse_loss(hs[obj_mask],torch.log(ths[obj_mask]))
         loss_wh = loss_w + loss_h
-        #res['wh']=loss_wh.item()
-        #res['xy']=loss_xy.item()
+        res['wh']=loss_wh.item()
+        res['xy']=loss_xy.item()
         loss_bbox = loss_xy+loss_wh #mse_loss(pd_bboxes[obj_mask],tbboxes[obj_mask])
-
+        if torch.isnan(loss_bbox):
+            exit()
         return loss_bbox,res
     
     def cal_cls_loss(self,pds,target,obj_mask,res):
@@ -223,8 +224,6 @@ class YOLOLossv3_com(YOLOLossv3):
         loss_xy = loss_x + loss_y
         loss_w = mse_loss(ws[obj_mask],torch.log(tws[obj_mask]))
         loss_h = mse_loss(hs[obj_mask],torch.log(ths[obj_mask]))
-        print('min',tws[obj_mask].min().item(),ths[obj_mask].min().item())
-        print(ws[obj_mask].max(),hs[obj_mask].max(),obj_mask.float().max())
         if torch.isnan(ws[obj_mask].max()):
             exit()
         loss_wh = loss_w + loss_h
@@ -237,8 +236,6 @@ class YOLOLossv3_com(YOLOLossv3):
         else:
             loss_iou = torch.tensor(0.0,dtype=torch.float,device=self.device)
             loss_gou = torch.tensor(0.0,dtype=torch.float,device=self.device)
-        print(loss_iou.item(),loss_wh.item())
-        print('+++++++++++++++++++++++++++++++++')
         res['iou'] = loss_iou.item()
         res['gou'] = loss_gou.item()
         return loss_gou+loss_wh+loss_xy,res
@@ -279,7 +276,6 @@ class LossAPI(nn.Module):
                for k in ret:
                    res[k] +=ret[k]/len(self.bbox_losses)
                totals.append(total)
-               print(total.item())
             return res,torch.stack(totals).mean()
 
 
