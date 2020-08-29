@@ -158,9 +158,10 @@ class YOLOLossv3(nn.Module):
         return loss_conf,res
     
     def forward(self,out,gts=None,infer=False):
-        nb,nc,nh,nw = out.shape
+        nb,_,nh,nw = out.shape
         self.device ='cuda' if out.is_cuda else 'cpu'
-        self.grid_size = grid_size = (nh,nw)
+        self.grid_size = (nh,nw)
+        grid_size = (nh,nw)
         pred = out.view(nb,self.num_anchors,self.cls_num+5,nh,nw).permute(0,1,3,4,2).contiguous()
         #reshape to nB,nA,nH,nW,bboxes       
 

@@ -26,8 +26,8 @@ class Config:
         self.bs = 1        
         
         if mode=='train':
-            self.file='./pre_data/trainval.json'
-            self.bs = 20 # batch size
+            self.file='./pre_data/train.json'
+            self.bs = 32 # batch size
             #augmentation parameter
             self.rot = 0
             self.crop = 0.2
