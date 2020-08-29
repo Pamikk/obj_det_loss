@@ -134,7 +134,9 @@ class Trainer:
                 if k in display.keys():
                     running_loss[k] += display[k]/n
             loss.backward()
-            
+            #solve gradient explosion problem caused by large learning rate or small batch size
+            #nn.utils.clip_grad_value_(self.net.parameters(), clip_value=2) 
+            nn.utils.clip_grad_norm_(self.net.parameters(),max_norm=2.0)
             if i == n-1 or (i+1) % self.upadte_grad_every_k_batch == 0:
                 self.optimizer.step()
                 self.optimizer.zero_grad()

@@ -214,21 +214,22 @@ class YOLOLossv3_gou(YOLOLossv3):
 class YOLOLossv3_com(YOLOLossv3):
     def cal_bbox_loss(self,pds,tbboxes,obj_mask,res):
         xs,ys,ws,hs,pd_bboxes = pds
+        xs,ys,ws,hs,_= pds
         txs = tbboxes[...,0] - tbboxes[...,0].floor()
         tys = tbboxes[...,1] - tbboxes[...,1].floor()
         tws = tbboxes[...,2]/self.scaled_anchors_w
         ths = tbboxes[...,3]/self.scaled_anchors_h
-
         loss_x = mse_loss(xs[obj_mask],txs[obj_mask])
         loss_y = mse_loss(ys[obj_mask],tys[obj_mask])
         loss_xy = loss_x + loss_y
         loss_w = mse_loss(ws[obj_mask],torch.log(tws[obj_mask]))
         loss_h = mse_loss(hs[obj_mask],torch.log(ths[obj_mask]))
-        if torch.isnan(ws[obj_mask].max()):
-            exit()
         loss_wh = loss_w + loss_h
         res['wh']=loss_wh.item()
         res['xy']=loss_xy.item()
+        loss_bbox = loss_xy+loss_wh #mse_loss(pd_bboxes[obj_mask],tbboxes[obj_mask])
+        if torch.isnan(loss_bbox):
+            exit()
         if obj_mask.float().max()>0:#avoid no gt_objs
             ious,gous = gou(pd_bboxes[obj_mask],tbboxes[obj_mask])
             loss_iou = 1 - ious.mean()
@@ -238,7 +239,7 @@ class YOLOLossv3_com(YOLOLossv3):
             loss_gou = torch.tensor(0.0,dtype=torch.float,device=self.device)
         res['iou'] = loss_iou.item()
         res['gou'] = loss_gou.item()
-        return loss_gou+loss_wh+loss_xy,res
+        return loss_gou+loss_bbox,res
 class YOLOLossv3_dice(YOLOLossv3):
     def cal_cls_loss(self,pds,target,obj_mask,res):
         loss_cls = dice_loss(pds[obj_mask],target[obj_mask])

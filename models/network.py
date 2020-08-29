@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import os
 
 from .backbone import ResNet,conv1x1,conv3x3,Darknet 
 def init_weights(m):
@@ -37,7 +38,7 @@ class NonResidual(nn.Module):
 class YOLO(nn.Module):
     def __init__(self,cfg):
         super(YOLO,self).__init__()
-        self.encoders = Darknet()
+        self.encoders = Darknet(os.path.join(cfg.pre_trained_path,'yolov3.weights'))
         self.out_channels = self.encoders.out_channels
         self.in_channel = self.out_channels.pop(0)
         self.relu = nn.LeakyReLU(0.1)
@@ -78,7 +79,7 @@ class YOLO(nn.Module):
 class YOLO_SPP(YOLO):
     def __init__(self,cfg):
         super(YOLO_SPP,self).__init__(cfg)
-        self.encoders = Darknet()
+        self.encoders = Darknet(os.path.join(cfg.pre_trained_path,'yolov3-spp.weights'))
         self.out_channels = self.encoders.out_channels
         self.in_channel = self.out_channels.pop(0)
         self.relu = nn.LeakyReLU(0.1)
