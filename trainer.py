@@ -48,7 +48,7 @@ class Trainer:
         self.logger = Logger(log_dir)
         torch.cuda.empty_cache()
         self.save_every_k_epoch = cfg.save_every_k_epoch #-1 for not save and validate
-        self.val_every_k_epoch = 5
+        self.val_every_k_epoch = 10
         self.upadte_grad_every_k_batch = 1
 
         self.best_mAP = 0
@@ -67,10 +67,20 @@ class Trainer:
         if start>0:
             self.load_epoch(str(start))
         if start==-1:
-            self.load_epoch('best')
+            self.load_last_epoch()
         if start==-2:
-            self.load_epoch('bestm')#best moving
+            self.load_epoch('best')#best moving
         self.net = self.net.to(self.device)
+    def load_last_epoch(self):
+        files = os.listdir(self.checkpoints)
+        idx =0
+        for name in files:
+            if name[-3]=='.pt':
+                idx = max(idx,int(name[6:-3]))
+        if idx==0:
+            return
+        else:
+            self.load_epoch(idx)
     def save_epoch(self,idx,epoch):
         saveDict = {'net':self.net.state_dict(),
                     'optimizer': self.optimizer.state_dict(),
