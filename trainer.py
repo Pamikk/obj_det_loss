@@ -198,7 +198,7 @@ class Trainer:
                 inputs,labels,info = data
                 outs = self.net(inputs.to(self.device).float())
                 size = inputs.shape[-2:]
-                pds = self.loss(outs,size,infer=True)
+                pds = self.loss(outs,size=size,infer=True)
                 nB = pds.shape[0]
                 for b in range(nB):
                     pred = pds[b].view(-1,self.cfg.cls_num+5)
@@ -244,7 +244,7 @@ class Trainer:
                 inputs,info = data
                 outs = self.net(inputs.to(self.device).float())
                 size = inputs.shape[-2:]
-                pds = self.loss(outs,size,infer=True)
+                pds = self.loss(outs,size=size,infer=True)
                 nB = pds.shape[0]
                 for b in range(nB):
                     pred = pds[b].view(-1,self.cfg.cls_num+5)
