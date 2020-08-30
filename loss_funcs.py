@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 import numpy as np
-from utils import iou_wo_center,iou_wt_center,gou,cal_gous
+from utils import iou_wo_center,generalized_iou
 #directly get by normalized anchor size, not accute according to YOLOv2, need change distance metric
 __all__=["MyLoss","MyLoss_v2","MyLoss_v3","MyLoss_v4"]  
 #Functional Utils
@@ -107,7 +107,7 @@ class YOLOLossv3(nn.Module):
         xs = torch.sigmoid(pred[...,0])#dxs
         ys = torch.sigmoid(pred[...,1])#dys
         ws = pred[...,2]
-        hs = pred[...,3] # modified to avoid unknown nan in gou loss
+        hs = pred[...,3] 
         conf = torch.sigmoid(pred[...,4])#Object score
         cls_score = torch.sigmoid(pred[...,5:])
         #grid,anchors
@@ -187,7 +187,7 @@ class YOLOLossv3_iou(YOLOLossv3):
     def cal_bbox_loss(self,pds,tbboxes,obj_mask,res):
         pd_bboxes = pds[-1]
         if obj_mask.float().max()>0:#avoid no gt_objs
-            ious,gous = gou(pd_bboxes[obj_mask],tbboxes[obj_mask])
+            ious,gous = generalized_iou(pd_bboxes[obj_mask],tbboxes[obj_mask])
             loss_iou = 1 - ious.mean()
             loss_gou = 1 - gous.mean()
         else:
@@ -200,7 +200,7 @@ class YOLOLossv3_gou(YOLOLossv3):
     def cal_bbox_loss(self,pds,tbboxes,obj_mask,res):
         pd_bboxes = pds[-1]
         if obj_mask.float().max()>0:#avoid no gt_objs
-            ious,gous = gou(pd_bboxes[obj_mask],tbboxes[obj_mask])
+            ious,gous = generalized_iou(pd_bboxes[obj_mask],tbboxes[obj_mask])
             loss_iou = 1 - ious.mean()
             loss_gou = 1 - gous.mean()
         else:
@@ -229,7 +229,7 @@ class YOLOLossv3_com(YOLOLossv3):
         if torch.isnan(loss_bbox):
             exit()
         if obj_mask.float().max()>0:#avoid no gt_objs
-            ious,gous = gou(pd_bboxes[obj_mask],tbboxes[obj_mask])
+            ious,gous = generalized_iou(pd_bboxes[obj_mask],tbboxes[obj_mask])
             loss_iou = 1 - ious.mean()
             loss_gou = 1 - gous.mean()
         else:

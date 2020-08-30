@@ -9,8 +9,8 @@ import os
 import json
 
 from utils import Logger
-from utils import cal_metrics_cls as cal_metrics
 from utils import non_maximum_supression as nms
+from utils import cal_tp_per_item,ap_per_class
 tosave=['mAP']
 thresholds = [0.5,0.75,0.95]
 class Trainer:
@@ -201,23 +201,23 @@ class Trainer:
         else:
             valset = self.trainval
         with torch.no_grad():
-            APs = dict.fromkeys(thresholds,0)
-            precisions = dict.fromkeys(thresholds,0)
-            recalls = dict.fromkeys(thresholds,0)
             mAP = 0
             count = 0
+            batch_metrics = dict.fromkeys(thresholds,[])
+            gt_labels = []
             for _,data in tqdm(enumerate(valset)):
                 inputs,labels,info = data
                 outs = self.net(inputs.to(self.device).float())
                 size = inputs.shape[-2:]
                 pds = self.loss(outs,size=size,infer=True)
-                nB = pds.shape[0]
+                nB = pds.shape[0]                
                 for b in range(nB):
                     pred = pds[b].view(-1,self.cfg.cls_num+5)
-                    gts = labels[labels[:,0]==b,1:]
                     name = info['img_id'][b]
                     size = info['size'][b]
                     pad = info['pad'][b]
+                    gt = labels[labels[:,0]==b,1:]
+                    gt_labels += gt[:,0].tolist()
                     pred[:,:4]*=size
                     pred[:,0] -= pad[1]
                     pred[:,1] -= pad[0]
@@ -227,23 +227,17 @@ class Trainer:
                         res[name] = pds_
                     pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)
                     count+=1
-                    total = 0
-                    for th in thresholds:
-                        p,r,ap = cal_metrics(pred_nms,gts,threshold= th)
-                        APs[th] += ap
-                        precisions[th] += p
-                        recalls[th] += r
-                        total +=ap
-                    mAP += 1.0*total/len(thresholds)
+                    for th in batch_metrics:
+                        batch_metrics[th].append(cal_tp_per_item(pred_nms,gt,th))
         metrics = {}
-        for th in thresholds:
-            metrics['AP/'+str(th)] = 1.0*APs[th]/count
-            metrics['Precision/'+str(th)] = 1.0*precisions[th]/count
-            metrics['Recall/'+str(th)] = 1.0*recalls[th]/count
-        mAP = 1.0*mAP/count
-        metrics['mAP'] = mAP
-        
-        
+        for th in batch_metrics:
+            tps,scores,pd_labels,gt_labels = [np.concatenate(x, 0) for x in list(zip(*batch_metrics[th]))]
+            precision, recall, AP,_,_ = ap_per_class(true_positives, pred_scores, pred_labels, labels)
+            mAP += AP
+            metrics['AP/'+str(th)] = AP
+            metrics['Precision/'+str(th)] = precision
+            metrics['Recall/'+str(th)] = recall
+        metrics['mAP'] = mAP/len(thresholds)
         if save:
             json.dump(res,open(os.path.join(self.predictions,'pred_epoch_'+str(epoch)+'.json'),'w'))
         

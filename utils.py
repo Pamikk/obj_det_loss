@@ -47,14 +47,18 @@ class Logger(object):
         writer.close()
 
 def iou_wo_center(w1,h1,w2,h2):
-    #only for torch, return a vector nx1
+    #assuming at the same center
+    #return a vector nx1
     inter = torch.min(w1,w2)*torch.min(h1,h2)
     union = w1*h1 + w2*h2 - inter
-    return inter/union
-def gou(bbox1,bbox2):
+    ious = inter/union
+    ious[ious!=ious] = torch.tensor(0.0) #avoid nans
+    return ious
+def generalized_iou(bbox1,bbox2):
+    #return shape nx1
     bbox1 = bbox1.view(-1,4)
     bbox2 = bbox2.view(-1,4)
-    
+    assert bbox1.shape[0]==bbox2.shape[0]
     #tranfer xc,yc,w,h to xmin ymin xmax ymax
     xmin1 = bbox1[:,0] - bbox1[:,2]/2
     xmin2 = bbox2[:,0] - bbox2[:,2]/2
@@ -78,17 +82,19 @@ def gou(bbox1,bbox2):
     inter_h = inter_ymax-inter_ymin
     mask = ((inter_w>=0 )&( inter_h >=0)).to(torch.float)
     # detect not overlap
-    cover = (cover_xmax-cover_xmin)*(cover_ymax-cover_ymin)+1e-16
+    cover = (cover_xmax-cover_xmin)*(cover_ymax-cover_ymin)
     #inter_h[inter_h<0] = 0
-    inter = inter_w*inter_h*mask+1e-16
+    inter = inter_w*inter_h*mask
     #keep iou<0 to avoid gradient diasppear
     area1 = bbox1[:,2]*bbox1[:,3]
     area2 = bbox2[:,2]*bbox2[:,3]
-    union = area1+area2 - inter+1e-16
-    iou = inter/union
-    gou = iou-(cover-union)/cover
-    return iou,gou
-def cal_gous(bbox1,bbox2):
+    union = area1+area2 - inter
+    ious = inter/union
+    gious = iou-(cover-union)/cover
+    ious[ious!=ious] = torch.tensor(0.0) #avoid nans
+    gous[gous!=gous] = torch.tensor(0.0) #avoid nans
+    return ious,gious
+def cal_gious_matrix(bbox1,bbox2):
     #return mxn matrix
     bbox1 = bbox1.view(-1,4)
     bbox2 = bbox2.view(-1,4)
@@ -115,6 +121,7 @@ def cal_gous(bbox1,bbox2):
     inter_w = inter_xmax-inter_xmin
     inter_h = inter_ymax-inter_ymin
     mask = ((inter_w>=0 )&( inter_h >=0)).to(torch.float)
+
     # detect not overlap
     cover = (cover_xmax-cover_xmin)*(cover_ymax-cover_ymin)
     #inter_h[inter_h<0] = 0
@@ -122,12 +129,14 @@ def cal_gous(bbox1,bbox2):
     #keep iou<0 to avoid gradient diasppear
     area1 = bbox1[:,2]*bbox1[:,3]
     area2 = bbox2[:,2]*bbox2[:,3]
-    union = area1.view(-1,1)+area2.view(1,-1)+1e-16
-    union-=inter
+    union = area1.view(-1,1)+area2.view(1,-1)
+    union -= inter
 
-    iou = inter/union
-    gou = iou-(cover-union)/cover
-    return iou,gou
+    ious = inter/union
+    gious = iou-(cover-union)/cover
+    ious[ious!=ious] = torch.tensor(0.0) #avoid nans
+    gous[gous!=gous] = torch.tensor(0.0) #avoid nans 
+    return ious,gious
 def iou_wt_center(bbox1,bbox2):
     #only for torch, return a vector nx1
     bbox1 = bbox1.view(-1,4)
@@ -159,8 +168,10 @@ def iou_wt_center(bbox1,bbox2):
     #keep iou<0 to avoid gradient diasppear
     area1 = bbox1[:,2]*bbox1[:,3]
     area2 = bbox2[:,2]*bbox2[:,3]
-    union = area1+area2 - inter+1e-16
-    return inter/union
+    union = area1+area2 - inter
+    ious = inter/union
+    ious[ious!=ious] = torch.tensor(0.0)
+    return ious
 def iou_wt_center_np(bbox1,bbox2):
     #in numpy,only for evaluation,return a matrix m x n
     bbox1 = bbox1.reshape(-1,4)
@@ -192,10 +203,117 @@ def iou_wt_center_np(bbox1,bbox2):
     inter = (inter_ymax-inter_ymin)*(inter_xmax-inter_xmin)
     area1 = ((ymax1-ymin1+1)*(xmax1-xmin1+1)).reshape(-1,1)
     area2 = ((ymax2-ymin2+1)*(xmax2-xmin2+1)).reshape(1,-1)
-    union = area1+area2 - inter +1e-16
-    return inter/union
+    union = area1+area2 - inter
+    ious = inter/union
+    ious[ious!=ious] = 0
+    return ious
 
+def ap_per_class(tp, conf, pred_cls, target_cls):
+    """ Compute the average precision, given the recall and precision curves.
+    Source: https://github.com/rafaelpadilla/Object-Detection-Metrics.
+    # Arguments
+        tp:    True positives (list).
+        conf:  Objectness value from 0-1 (list).
+        pred_cls: Predicted object classes (list).
+        target_cls: True object classes (list).
+    # Returns
+        The average precision as computed in py-faster-rcnn.
+    """
 
+    # Sort by objectness
+    i = np.argsort(-conf)
+    tp, conf, pred_cls = tp[i], conf[i], pred_cls[i]
+
+    # Find unique classes
+    unique_classes = np.unique(target_cls)
+
+    # Create Precision-Recall curve and compute AP for each class
+    ap, p, r = [], [], []
+    for c in tqdm.tqdm(unique_classes, desc="Computing AP"):
+        i = pred_cls == c
+        n_gt = (target_cls == c).sum()  # Number of ground truth objects
+        n_p = i.sum()  # Number of predicted objects
+
+        if n_p == 0 and n_gt == 0:
+            continue
+        elif n_p == 0 or n_gt == 0:
+            ap.append(0)
+            r.append(0)
+            p.append(0)
+        else:
+            # Accumulate FPs and TPs
+            fpc = (1 - tp[i]).cumsum()
+            tpc = (tp[i]).cumsum()
+
+            # Recall
+            recall_curve = tpc / (n_gt + 1e-16)
+            r.append(recall_curve[-1])
+
+            # Precision
+            precision_curve = tpc / (tpc + fpc)
+            p.append(precision_curve[-1])
+
+            # AP from recall-precision curve
+            ap.append(compute_ap(recall_curve, precision_curve))
+
+    # Compute F1 score (harmonic mean of precision and recall)
+    p, r, ap = np.array(p), np.array(r), np.array(ap)
+    f1 = 2 * p * r / (p + r + 1e-16)
+
+    return p, r, ap, f1, unique_classes.astype("int32")
+
+def compute_ap(recall, precision):
+    """ Compute the average precision, given the recall and precision curves.
+    Code originally from https://github.com/rbgirshick/py-faster-rcnn.
+
+    # Arguments
+        recall:    The recall curve (list).
+        precision: The precision curve (list).
+    # Returns
+        The average precision as computed in py-faster-rcnn.
+    """
+    # correct AP calculation
+    # first append sentinel values at the end
+    mrec = np.concatenate(([0.0], recall, [1.0]))
+    mpre = np.concatenate(([0.0], precision, [0.0]))
+
+    # compute the precision envelope
+    for i in range(mpre.size - 1, 0, -1):
+        mpre[i - 1] = np.maximum(mpre[i - 1], mpre[i])
+
+    # to calculate area under PR curve, look for points
+    # where X axis (recall) changes value
+    i = np.where(mrec[1:] != mrec[:-1])[0]
+
+    # and sum (\Delta recall) * prec
+    ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
+    return ap
+
+def cal_tp_per_item(pds,gts,threshold=0.5):
+    assert (len(pds.shape)>1) and (len(gts.shape)>1)
+    n = pds.shape[0]
+    tps = np.zeros(n)
+    labels = gts[:,0].numpy()
+    for c in np.unique(labels):
+        mask_pd = pds[:,-1] == c
+        pdbboxes = pds[mask_pd,:4].reshape(-1,4)
+        gtbboxes = gts[gts[:,0] == c,1:].reshape(-1,4)
+        nc = pdbboxes.shape[0]
+        mc = gtbboxes.shape[0]
+        tpsc = np.zeros(nc)
+        selected = np.zeros(mc)
+        for i in range(len(nc)):
+            if mc == 0:
+                break
+            pdbbox = pdbboxes[i]
+            iou,best = iou_wt_center_np(pdbbox,gtbboxes).max(axis=0)
+            if iou >=threshold  and selected[i] !=1:
+                selected[best] = 1
+                tpsc[i] = 1
+        tps[mask_pd][tpsc] = 1
+    return [tps,pds[:,-2],pds[:,-1]]    
+
+    
 
 def cal_metrics_wo_cls(pd,gt,threshold=0.5):
     pd = pd.cpu().numpy()#n
@@ -233,55 +351,6 @@ def cal_metrics_wo_cls(pd,gt,threshold=0.5):
         return 0,0,0
     else:
         return 1,1,1
-def cal_metrics_cls(pd,gt,threshold=0.5):
-    pd = pd.cpu().numpy()#n
-    gt = gt.cpu().numpy()#m
-    m = len(gt)
-    n = len(pd)
-    cls_num = len(voc_classes)-1
-    if n>0 and m>0:
-        fp = 0
-        fn = 0
-        tp = 0
-        for i in range(cls_num):
-            gt_bboxes = gt[gt[:,0]==i,1:]
-            pd_bboxes = pd[pd[:,-1]==i,:4]
-            if gt_bboxes.shape[0]==0:
-                fp += pd_bboxes.shape[0]
-                continue
-            if pd_bboxes.shape[0]==0:
-                fn += gt_bboxes.shape[0]
-                continue
-            ious = iou_wt_center_np(pd_bboxes,gt_bboxes) #nxm
-            scores = ious.max(axis=1) 
-            fp_ = scores <= threshold
-
-            #only keep trues
-            ious = ious[~fp_,:]
-            fp += fp_.sum() # transfer to scalar
-
-
-            select_ids = ious.argmax(axis=1)
-            #discard fps hit gt boxes has been hitted by bboxes with higher conf
-            tp_ = len(np.unique(select_ids))
-            fp += len(select_ids) - tp_
-            tp += tp_
-            fn += gt_bboxes.shape[0]-tp_
-
-        
-        # groud truth with no associated predicted object
-        assert (fp+tp)==n
-        assert (fn+tp)==m
-        p = tp/n
-        r = tp/m
-        assert(p<=1)
-        assert(r<=1)
-        ap = tp/(fp+fn+tp)
-        return p,r,ap
-    elif m>0 or n >0 :
-        return 0,0,0
-    else:
-        return 1,1,1
 
 
     
@@ -292,11 +361,11 @@ def non_maximum_supression(preds,conf_threshold=0.5,nms_threshold = 0.4):
     score = preds[:,4]*preds[:,5:].max(1)[0]
     idx = torch.argsort(score,descending=True)
     preds = preds[idx]
-    #preds = preds[score[idx] >= conf_threshold]    
+    preds = preds[score[idx] >= conf_threshold]    
     if len(preds) == 0:
         return preds 
     cls_confs,cls_labels = torch.max(preds[:,5:],dim=1,keepdim=True)
-    dets = torch.cat((preds[:,:5],cls_confs.float(),cls_labels.float()),dim=1)
+    dets = torch.cat((preds[:,:4],preds[:,4]*cls_confs.float(),cls_labels.float()),dim=1)
     keep = []
     while len(dets)>0:
         mask = dets[0,-1]==dets[:,-1]
@@ -308,11 +377,11 @@ def non_maximum_supression(preds,conf_threshold=0.5,nms_threshold = 0.4):
         mask = mask & (ious>nms_threshold)
         #hard-nms        
         dets = dets[~mask]
-    return torch.stack(keep)
+    return torch.stack(keep).reshape(-1,6)
 def non_maximum_supression_soft(preds,conf_threshold=0.5,nms_threshold=0.4):
     keep = []
     cls_confs,cls_labels = torch.max(preds[:,5:],dim=1,keepdim=True)
-    dets = torch.cat((preds[:,:5],cls_confs.float(),cls_labels.float()),dim=1)
+    dets = torch.cat((preds[:,:4],preds[:,4]*cls_confs.float(),cls_labels.float()),dim=1)
     dets = dets[dets[:,4]>conf_threshold]
     while len(dets)>0:
         _,idx = torch.max(dets[:,4]*dets[:,5],dim=0)
@@ -324,8 +393,8 @@ def non_maximum_supression_soft(preds,conf_threshold=0.5,nms_threshold=0.4):
         keep.append(pd)
         dets[mask,4] *= (1-ious[mask])*(1-val)
         dets = dets[dets[:,4]>conf_threshold]
-    print(len(keep))
-    return torch.stack(keep)
+    return torch.stack(keep).reshape(-1,6)
+
 
 
 
