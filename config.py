@@ -23,7 +23,7 @@ class Config:
         self.obj_scale = 2.5
         self.noobj_scale = 0.5
         self.ignore_threshold = 0.5
-        self.bs = 1        
+        self.bs = 8        
         self.pre_trained_path = '../network_weights'
         if mode=='train':
             self.file='./pre_data/train.json'
@@ -33,11 +33,11 @@ class Config:
             self.crop = 0.2
             self.valid_scale = 0.25
             #train_setting
-            self.lr = 0.001
+            self.lr = 0.1
             self.weight_decay=5e-4
             self.momentum = 0.9
-            self.min_lr = 5e-6
-            self.lr_factor = 0.25
+            self.min_lr = 1e-3
+            self.lr_factor = 0.1
             #exp_setting
             self.save_every_k_epoch = 10
 

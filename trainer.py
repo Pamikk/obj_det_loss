@@ -152,13 +152,15 @@ class Trainer:
         epoch = self.start
         
         #torch.autograd.set_detect_anomaly(True)
-        while epoch < self.total:
+        while epoch < self.total and self.early_stop_epochs>0:
             running_loss = self.train_one_epoch()            
             lr = self.optimizer.param_groups[0]['lr']
             self.logger.write_loss(epoch,running_loss,lr)
             #step lr
             self.lr_sheudler.step(running_loss['all'])
             lr_ = self.optimizer.param_groups[0]['lr']
+            if lr_ == self.cfg.min_lr:
+                self.early_stop_epochs -=1
             if lr_ != lr:
                 self.save_epoch(str(epoch),epoch)
             if (epoch+1)%self.save_every_k_epoch==0:
