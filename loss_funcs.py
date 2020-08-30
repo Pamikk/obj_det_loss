@@ -76,13 +76,13 @@ class YOLOLossv3(nn.Module):
             return obj_mask,noobj_mask,tbboxes,tcls,obj_mask.float()
         #convert target
         gt_boxes = gts[:,2:]
-        gws = gt_boxes[:,2]*nW
-        ghs = gt_boxes[:,3]*nH
+        gws = gt_boxes[:,2]
+        ghs = gt_boxes[:,3]
         batch = gts[:,0].long()
         gt_labels = gts[:,1].long()
         gxs,gys = gt_boxes[:,0]*nW,gt_boxes[:,1]*nH
         gis,gjs = gxs.long(),gys.long()
-        anchors = zip(self.scaled_anchors_w.squeeze(),self.scaled_anchors_h.squeeze())
+        anchors = torch.tensor(self.anchors,dtype=torch.float,device=self.device)
         #calculate bbox ious with anchors
         ious = torch.stack([iou_wo_center(gws,ghs,w,h) for (w,h) in anchors])
         _, best_n = ious.max(0)
@@ -112,19 +112,17 @@ class YOLOLossv3(nn.Module):
         cls_score = torch.sigmoid(pred[...,5:])
         #grid,anchors
         grid_x,grid_y = make_grid_mesh_xy(self.grid_size,self.device)
-        self.scaled_anchors_w = self.anchors_w/self.stride[1]
-        self.scaled_anchors_h = self.anchors_h/self.stride[0]
 
         pd_bboxes = torch.zeros_like(pred[...,:4],dtype=torch.float,device=self.device)
         pd_bboxes[...,0] = xs + grid_x
         pd_bboxes[...,1] = ys + grid_y
-        pd_bboxes[...,2] = torch.exp(ws)*self.scaled_anchors_w
-        pd_bboxes[...,3] = torch.exp(hs)*self.scaled_anchors_h
+        pd_bboxes[...,2] = torch.exp(ws)*self.anchors_w
+        pd_bboxes[...,3] = torch.exp(hs)*self.anchors_h
         nb = pred.shape[0]        
         if infer:
             #normalize to [0,1]
-            pd_bboxes[...,[0,2]]/=self.grid_size[1]
-            pd_bboxes[...,[1,3]]/=self.grid_size[0]            
+            pd_bboxes[...,0]/=self.grid_size[1]
+            pd_bboxes[...,1]/=self.grid_size[0]            
             return torch.cat((pd_bboxes.view(nb,-1,4),conf.view(nb,-1,1),cls_score.view(nb,-1,self.cls_num)),dim=-1)
         else:
             pds_bbox = (xs,ys,ws,hs,pd_bboxes)
@@ -136,8 +134,8 @@ class YOLOLossv3(nn.Module):
         xs,ys,ws,hs,_= pds
         txs = tbboxes[...,0] - tbboxes[...,0].floor()
         tys = tbboxes[...,1] - tbboxes[...,1].floor()
-        tws = tbboxes[...,2]/self.scaled_anchors_w
-        ths = tbboxes[...,3]/self.scaled_anchors_h
+        tws = tbboxes[...,2]/(self.anchors_w)
+        ths = tbboxes[...,3]/(self.anchors_h)
         loss_x = mse_loss(xs[obj_mask],txs[obj_mask])
         loss_y = mse_loss(ys[obj_mask],tys[obj_mask])
         loss_xy = loss_x + loss_y
@@ -217,8 +215,8 @@ class YOLOLossv3_com(YOLOLossv3):
         xs,ys,ws,hs,_= pds
         txs = tbboxes[...,0] - tbboxes[...,0].floor()
         tys = tbboxes[...,1] - tbboxes[...,1].floor()
-        tws = tbboxes[...,2]/self.scaled_anchors_w
-        ths = tbboxes[...,3]/self.scaled_anchors_h
+        tws = tbboxes[...,2]/self.anchors_w
+        ths = tbboxes[...,3]/self.anchors_h
         loss_x = mse_loss(xs[obj_mask],txs[obj_mask])
         loss_y = mse_loss(ys[obj_mask],tys[obj_mask])
         loss_xy = loss_x + loss_y

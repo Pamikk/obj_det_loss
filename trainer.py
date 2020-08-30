@@ -32,7 +32,7 @@ class Trainer:
         self.device = cfg.device
         self.net = self.net
         self.optimizer = optim.SGD(self.net.parameters(),lr=cfg.lr,momentum=cfg.momentum,weight_decay=cfg.weight_decay)
-        self.lr_sheudler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,mode='min', factor=cfg.lr_factor, threshold=0.0001,patience=4,min_lr=cfg.min_lr)
+        self.lr_sheudler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,mode='min', factor=cfg.lr_factor, threshold=0.0001,patience=1,min_lr=cfg.min_lr)
         if not(os.path.exists(self.checkpoints)):
             os.mkdir(self.checkpoints)
         self.predictions = os.path.join(self.checkpoints,'pred')
@@ -160,9 +160,9 @@ class Trainer:
         self.optimizer.zero_grad()
         print(self.optimizer.param_groups[0]['lr'])
         epoch = self.start
-        
+        stop_epochs = 0
         #torch.autograd.set_detect_anomaly(True)
-        while epoch < self.total and self.early_stop_epochs>0:
+        while epoch < self.total and stop_epochs<self.early_stop_epochs:
             running_loss = self.train_one_epoch()            
             lr = self.optimizer.param_groups[0]['lr']
             self.logger.write_loss(epoch,running_loss,lr)
@@ -170,7 +170,7 @@ class Trainer:
             self.lr_sheudler.step(running_loss['all'])
             lr_ = self.optimizer.param_groups[0]['lr']
             if lr_ == self.cfg.min_lr:
-                self.early_stop_epochs -=1
+                stop_epochs +=1
             if lr_ != lr:
                 self.save_epoch(str(epoch),epoch)
             if (epoch+1)%self.save_every_k_epoch==0:

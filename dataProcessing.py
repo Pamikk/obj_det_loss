@@ -119,7 +119,9 @@ class VOC_dataset(data.Dataset):
             labels[:,1]+=pad[1]
             labels[:,2]+=pad[0]
             if random.randint(0,1)==1:
+                print('flip')
                 img,labels = flip(img,labels)
+            print(labels)
             data = self.img_to_tensor(img)
             labels = self.normalize_gts(labels,h)
             return data,labels      
