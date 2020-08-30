@@ -210,29 +210,37 @@ class Trainer:
                 outs = self.net(inputs.to(self.device).float())
                 size = inputs.shape[-2:]
                 pds = self.loss(outs,size=size,infer=True)
-                nB = pds.shape[0]                
+                nB = pds.shape[0]
+                gt_labels += labels[:,1].tolist()               
                 for b in range(nB):
                     pred = pds[b].view(-1,self.cfg.cls_num+5)
-                    name = info['img_id'][b]
-                    size = info['size'][b]
-                    pad = info['pad'][b]
-                    gt = labels[labels[:,0]==b,1:]
-                    gt_labels += gt[:,0].tolist()
-                    pred[:,:4]*=size
-                    pred[:,0] -= pad[1]
-                    pred[:,1] -= pad[0]
                     if save:
                         pds_ = list(pred.cpu().numpy().astype(float))
                         pds_ = [list(pd) for pd in pds_]
-                        res[name] = pds_
+                        result = [pds_,pad]
+                        res[name] = result
                     pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)
+                    ##if pred_nms.shape[0]>0:
+                       ##print(pred_nms[0])
+                    name = info['img_id'][b]
+                    size = info['size'][b]
+                    pad = info['pad'][b]
+                    ##print(name)
+                    ##print(pad)
+                    gt = labels[labels[:,0]==b,1:].reshape(-1,5)                   
+                    pred_nms[:,:4]*=size
+                    pred_nms[:,0] -= pad[1]
+                    pred_nms[:,1] -= pad[0]
+                    ##if pred_nms.shape[0]>0:
+                       ##print(pred_nms[0])
                     count+=1
                     for th in batch_metrics:
                         batch_metrics[th].append(cal_tp_per_item(pred_nms,gt,th))
+                ##exit()
         metrics = {}
         for th in batch_metrics:
-            tps,scores,pd_labels,gt_labels = [np.concatenate(x, 0) for x in list(zip(*batch_metrics[th]))]
-            precision, recall, AP,_,_ = ap_per_class(true_positives, pred_scores, pred_labels, labels)
+            tps,scores,pd_labels = [np.concatenate(x, 0) for x in list(zip(*batch_metrics[th]))]
+            precision, recall, AP,_,_ = ap_per_class(tps, scores, pd_labels, gt_labels)
             mAP += AP
             metrics['AP/'+str(th)] = AP
             metrics['Precision/'+str(th)] = precision

@@ -10,6 +10,7 @@ voc_classes= {'__background__':0, 'aeroplane':1, 'bicycle':2,
            'cat':8, 'chair':9,'cow':10, 'diningtable':11, 'dog':12,
             'horse':13,'motorbike':14, 'person':15, 'pottedplant':16,
             'sheep':17, 'sofa':18, 'train':19, 'tvmonitor':20}
+voc_indices = dict([(voc_classes[k]-1,k) for k in voc_classes])
 class Logger(object):
     def __init__(self,log_dir):
         self.log_dir = log_dir
@@ -291,26 +292,36 @@ def compute_ap(recall, precision):
 
 def cal_tp_per_item(pds,gts,threshold=0.5):
     assert (len(pds.shape)>1) and (len(gts.shape)>1)
+    pds = pds.cpu().numpy()
+    gts = gts.cpu().numpy()
     n = pds.shape[0]
     tps = np.zeros(n)
-    labels = gts[:,0].numpy()
-    for c in np.unique(labels):
+    labels = np.unique(gts[:,0].astype(np.int))
+    ##print(len(labels))
+    for c in labels:
         mask_pd = pds[:,-1] == c
         pdbboxes = pds[mask_pd,:4].reshape(-1,4)
         gtbboxes = gts[gts[:,0] == c,1:].reshape(-1,4)
+        ##print(voc_indices[int(c)])
+        ##print(pdbboxes)
+        ##print(gtbboxes)
         nc = pdbboxes.shape[0]
         mc = gtbboxes.shape[0]
         tpsc = np.zeros(nc)
         selected = np.zeros(mc)
-        for i in range(len(nc)):
+        for i in range(nc):
             if mc == 0:
                 break
             pdbbox = pdbboxes[i]
-            iou,best = iou_wt_center_np(pdbbox,gtbboxes).max(axis=0)
-            if iou >=threshold  and selected[i] !=1:
+            ious = iou_wt_center_np(pdbbox,gtbboxes)
+            iou = ious.max()
+            best = ious.argmax()
+            ##print(iou)
+            if iou >=threshold  and selected[best] !=1:
                 selected[best] = 1
                 tpsc[i] = 1
-        tps[mask_pd][tpsc] = 1
+                mc -=1
+        tps[mask_pd][tpsc==1] = 1
     return [tps,pds[:,-2],pds[:,-1]]    
 
     
@@ -365,7 +376,7 @@ def non_maximum_supression(preds,conf_threshold=0.5,nms_threshold = 0.4):
     if len(preds) == 0:
         return preds 
     cls_confs,cls_labels = torch.max(preds[:,5:],dim=1,keepdim=True)
-    dets = torch.cat((preds[:,:4],preds[:,4]*cls_confs.float(),cls_labels.float()),dim=1)
+    dets = torch.cat((preds[:,:4],preds[:,4].reshape(-1,1)*cls_confs,cls_labels.float()),dim=1)
     keep = []
     while len(dets)>0:
         mask = dets[0,-1]==dets[:,-1]
@@ -381,7 +392,7 @@ def non_maximum_supression(preds,conf_threshold=0.5,nms_threshold = 0.4):
 def non_maximum_supression_soft(preds,conf_threshold=0.5,nms_threshold=0.4):
     keep = []
     cls_confs,cls_labels = torch.max(preds[:,5:],dim=1,keepdim=True)
-    dets = torch.cat((preds[:,:4],preds[:,4]*cls_confs.float(),cls_labels.float()),dim=1)
+    dets = torch.cat((preds[:,:4],preds[:,4].reshape(-1,1)*cls_confs,cls_labels.float()),dim=1)
     dets = dets[dets[:,4]>conf_threshold]
     while len(dets)>0:
         _,idx = torch.max(dets[:,4]*dets[:,5],dim=0)
