@@ -11,7 +11,7 @@ class Config:
         self.sizes = [384,416,448]
         self.sizes_w = [1,1,1]
         self.nms_threshold = 0.5
-        self.dc_threshold = 0.1
+        self.dc_threshold = 0.4
         #loss args
         #self.anchors = [[0.26533935,0.33382434],[0.66550966,0.56042827],[0.0880948,0.11774004]] #w,h normalized by max size
         #self.anchors = [[0.76822971,0.57259308],[0.39598597,0.47268035],[0.20632625,0.26720238],[0.07779112,0.10330848]] 
@@ -20,7 +20,7 @@ class Config:
            [329.9393296563428, 164.39669070852779],[296.2381738173817, 358.98624862486247],[438.50071873502634, 293.79731672256827]]
         self.anchor_divide=[(6,7,8),(3,4,5),(0,1,2)]
         self.anchor_num = len(self.anchors)
-        self.obj_scale = 1
+        self.obj_scale = 2.5
         self.noobj_scale = 0.5
         self.ignore_threshold = 0.5
         self.bs = 1        
