@@ -241,10 +241,10 @@ class Trainer:
         for th in batch_metrics:
             tps,scores,pd_labels = [np.concatenate(x, 0) for x in list(zip(*batch_metrics[th]))]
             precision, recall, AP,_,_ = ap_per_class(tps, scores, pd_labels, gt_labels)
-            mAP += AP
-            metrics['AP/'+str(th)] = AP
-            metrics['Precision/'+str(th)] = precision
-            metrics['Recall/'+str(th)] = recall
+            mAP += np.mean(AP)
+            metrics['AP/'+str(th)] = np.mean(AP)
+            metrics['Precision/'+str(th)] = np.mean(precision)
+            metrics['Recall/'+str(th)] = np.mean(recall)
         metrics['mAP'] = mAP/len(thresholds)
         if save:
             json.dump(res,open(os.path.join(self.predictions,'pred_epoch_'+str(epoch)+'.json'),'w'))
