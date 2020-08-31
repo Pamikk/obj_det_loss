@@ -5,6 +5,7 @@ import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 import os 
 import json
+from tqdm import tqdm
 voc_classes= {'__background__':0, 'aeroplane':1, 'bicycle':2, 
           'bird':3, 'boat':4, 'bottle':5,'bus':6, 'car':7,
            'cat':8, 'chair':9,'cow':10, 'diningtable':11, 'dog':12,
@@ -230,7 +231,7 @@ def ap_per_class(tp, conf, pred_cls, target_cls):
 
     # Create Precision-Recall curve and compute AP for each class
     ap, p, r = [], [], []
-    for c in tqdm.tqdm(unique_classes, desc="Computing AP"):
+    for c in tqdm(unique_classes, desc="Computing AP"):
         i = pred_cls == c
         n_gt = (target_cls == c).sum()  # Number of ground truth objects
         n_p = i.sum()  # Number of predicted objects

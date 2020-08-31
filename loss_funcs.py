@@ -104,18 +104,19 @@ class YOLOLossv3(nn.Module):
         return obj_mask,noobj_mask,tbboxes,tcls,obj_mask.float()
     
     def get_pds_and_targets(self,pred,infer=False,gts=None):
-        xs = torch.sigmoid(pred[...,0])#dxs
-        ys = torch.sigmoid(pred[...,1])#dys
+        grid_x,grid_y = make_grid_mesh_xy(self.grid_size,self.device)
+        xs = torch.sigmoid(pred[...,0])+ grid_x#dxs
+        ys = torch.sigmoid(pred[...,1])+ grid_y#dys
         ws = pred[...,2]
         hs = pred[...,3] 
         conf = torch.sigmoid(pred[...,4])#Object score
         cls_score = torch.sigmoid(pred[...,5:])
         #grid,anchors
-        grid_x,grid_y = make_grid_mesh_xy(self.grid_size,self.device)
+        
 
         pd_bboxes = torch.zeros_like(pred[...,:4],dtype=torch.float,device=self.device)
-        pd_bboxes[...,0] = xs + grid_x
-        pd_bboxes[...,1] = ys + grid_y
+        pd_bboxes[...,0] = xs
+        pd_bboxes[...,1] = ys
         pd_bboxes[...,2] = torch.exp(ws)*self.anchors_w
         pd_bboxes[...,3] = torch.exp(hs)*self.anchors_h
         nb = pred.shape[0]        
@@ -132,8 +133,8 @@ class YOLOLossv3(nn.Module):
     
     def cal_bbox_loss(self,pds,tbboxes,obj_mask,res):
         xs,ys,ws,hs,_= pds
-        txs = tbboxes[...,0] - tbboxes[...,0].floor()
-        tys = tbboxes[...,1] - tbboxes[...,1].floor()
+        txs = tbboxes[...,0]
+        tys = tbboxes[...,1]
         tws = tbboxes[...,2]/(self.anchors_w)
         ths = tbboxes[...,3]/(self.anchors_h)
         loss_x = mse_loss(xs[obj_mask],txs[obj_mask])
