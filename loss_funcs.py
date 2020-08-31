@@ -246,7 +246,7 @@ class YOLOLossv3_dice(YOLOLossv3):
     
     def cal_obj_loss(self,pds,target,obj_mask,res):
         noobj_mask,tconf = target
-        mask = noobj_mask + obj_mask
+        mask = noobj_mask | obj_mask
 
         loss_conf = dice_loss1d(pds[mask],tconf[mask])
         #res['obj'] = loss_conf_obj.item()
