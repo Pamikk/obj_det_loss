@@ -32,7 +32,7 @@ class Trainer:
         self.device = cfg.device
         self.net = self.net
         self.optimizer = optim.Adam(self.net.parameters(),lr=cfg.lr,weight_decay=cfg.weight_decay)
-        self.lr_sheudler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,mode='min', factor=cfg.lr_factor, threshold=0.0001,patience=1,min_lr=cfg.min_lr)
+        self.lr_sheudler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,mode='min', factor=cfg.lr_factor, threshold=0.0001,patience=cfg.patience,min_lr=cfg.min_lr)
         if not(os.path.exists(self.checkpoints)):
             os.mkdir(self.checkpoints)
         self.predictions = os.path.join(self.checkpoints,'pred')
@@ -48,7 +48,7 @@ class Trainer:
         self.logger = Logger(log_dir)
         torch.cuda.empty_cache()
         self.save_every_k_epoch = cfg.save_every_k_epoch #-1 for not save and validate
-        self.val_every_k_epoch = 10
+        self.val_every_k_epoch = cfg.val_every_k_epoch
         self.upadte_grad_every_k_batch = 1
 
         self.best_mAP = 0
@@ -62,7 +62,7 @@ class Trainer:
         self.nms_threshold = cfg.nms_threshold
         self.conf_threshold = cfg.dc_threshold
         self.save_pred = False
-        self.adjust_lr = False
+        self.adjust_lr = cfg.adjust_lr
         #load from epoch if required
         if start>0:
             self.load_epoch(str(start))

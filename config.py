@@ -36,10 +36,14 @@ class Config:
             self.lr = 0.1
             self.weight_decay=5e-4
             self.momentum = 0.9
+            #lr_scheduler
             self.min_lr = 1e-3
             self.lr_factor = 0.1
+            self.patience = 1
             #exp_setting
             self.save_every_k_epoch = 10
+            self.val_every_k_epoch = 10
+            self.adjust_lr = False
 
         elif mode=='val':
             self.file = './pre_data/val.json'
