@@ -73,14 +73,17 @@ class Trainer:
         self.net = self.net.to(self.device)
     def load_last_epoch(self):
         files = os.listdir(self.checkpoints)
-        idx =0
+        idx = 0
         for name in files:
-            if name[-3]=='.pt':
-                idx = max(idx,int(name[6:-3]))
+            if name[-3:]=='.pt':
+                epoch = name[6:-3]
+                if epoch=='best':
+                  continue
+                idx = max(idx,int(epoch))
         if idx==0:
-            return
+            exit()
         else:
-            self.load_epoch(idx)
+            self.load_epoch(str(idx))
     def save_epoch(self,idx,epoch):
         saveDict = {'net':self.net.state_dict(),
                     'optimizer': self.optimizer.state_dict(),
