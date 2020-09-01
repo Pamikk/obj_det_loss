@@ -92,9 +92,9 @@ def generalized_iou(bbox1,bbox2):
     area2 = bbox2[:,2]*bbox2[:,3]
     union = area1+area2 - inter
     ious = inter/union
-    gious = iou-(cover-union)/cover
+    gious = ious-(cover-union)/cover
     ious[ious!=ious] = torch.tensor(0.0) #avoid nans
-    gous[gous!=gous] = torch.tensor(0.0) #avoid nans
+    gious[gious!=gious] = torch.tensor(0.0) #avoid nans
     return ious,gious
 def cal_gious_matrix(bbox1,bbox2):
     #return mxn matrix
@@ -202,9 +202,8 @@ def iou_wt_center_np(bbox1,bbox2):
     
     #inter_h[inter_h<0] = 0
     inter = inter_w*inter_h*mask.astype(float)
-    inter = (inter_ymax-inter_ymin)*(inter_xmax-inter_xmin)
-    area1 = ((ymax1-ymin1+1)*(xmax1-xmin1+1)).reshape(-1,1)
-    area2 = ((ymax2-ymin2+1)*(xmax2-xmin2+1)).reshape(1,-1)
+    area1 = ((ymax1-ymin1)*(xmax1-xmin1)).reshape(-1,1)
+    area2 = ((ymax2-ymin2)*(xmax2-xmin2)).reshape(1,-1)
     union = area1+area2 - inter
     ious = inter/union
     ious[ious!=ious] = 0
@@ -298,14 +297,14 @@ def cal_tp_per_item(pds,gts,threshold=0.5):
     n = pds.shape[0]
     tps = np.zeros(n)
     labels = np.unique(gts[:,0].astype(np.int))
-    ##print(len(labels))
+    print(len(labels))
     for c in labels:
         mask_pd = pds[:,-1] == c
         pdbboxes = pds[mask_pd,:4].reshape(-1,4)
         gtbboxes = gts[gts[:,0] == c,1:].reshape(-1,4)
-        ##print(voc_indices[int(c)])
-        ##print(pdbboxes)
-        ##print(gtbboxes)
+        print(voc_indices[int(c)])
+        print(pdbboxes)
+        print(gtbboxes)
         nc = pdbboxes.shape[0]
         mc = gtbboxes.shape[0]
         tpsc = np.zeros(nc)
@@ -317,7 +316,7 @@ def cal_tp_per_item(pds,gts,threshold=0.5):
             ious = iou_wt_center_np(pdbbox,gtbboxes)
             iou = ious.max()
             best = ious.argmax()
-            ##print(iou)
+            print(iou)
             if iou >=threshold  and selected[best] !=1:
                 selected[best] = 1
                 tpsc[i] = 1

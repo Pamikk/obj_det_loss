@@ -31,7 +31,7 @@ class Trainer:
         self.checkpoints = os.path.join(cfg.checkpoint,name)
         self.device = cfg.device
         self.net = self.net
-        self.optimizer = optim.SGD(self.net.parameters(),lr=cfg.lr,momentum=cfg.momentum,weight_decay=cfg.weight_decay)
+        self.optimizer = optim.Adam(self.net.parameters(),lr=cfg.lr,weight_decay=cfg.weight_decay)
         self.lr_sheudler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,mode='min', factor=cfg.lr_factor, threshold=0.0001,patience=1,min_lr=cfg.min_lr)
         if not(os.path.exists(self.checkpoints)):
             os.mkdir(self.checkpoints)
@@ -170,6 +170,7 @@ class Trainer:
             self.lr_sheudler.step(running_loss['all'])
             lr_ = self.optimizer.param_groups[0]['lr']
             if lr_ == self.cfg.min_lr:
+                print(lr_-self.cfg.min_lr)
                 stop_epochs +=1
             if lr_ != lr:
                 self.save_epoch(str(epoch),epoch)
@@ -220,23 +221,23 @@ class Trainer:
                         result = [pds_,pad]
                         res[name] = result
                     pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)
-                    ##if pred_nms.shape[0]>0:
-                       ##print(pred_nms[0])
+                    if pred_nms.shape[0]>0:
+                       print(pred_nms[0])
                     name = info['img_id'][b]
                     size = info['size'][b]
                     pad = info['pad'][b]
-                    ##print(name)
-                    ##print(pad)
+                    print(name)
+                    print(pad)
                     gt = labels[labels[:,0]==b,1:].reshape(-1,5)                   
                     pred_nms[:,:4]*=size
                     pred_nms[:,0] -= pad[1]
                     pred_nms[:,1] -= pad[0]
-                    ##if pred_nms.shape[0]>0:
-                       ##print(pred_nms[0])
+                    if pred_nms.shape[0]>0:
+                       print(pred_nms[0])
                     count+=1
                     for th in batch_metrics:
                         batch_metrics[th].append(cal_tp_per_item(pred_nms,gt,th))
-                ##exit()
+                exit()
         metrics = {}
         for th in batch_metrics:
             tps,scores,pd_labels = [np.concatenate(x, 0) for x in list(zip(*batch_metrics[th]))]
