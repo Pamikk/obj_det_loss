@@ -222,22 +222,22 @@ class Trainer:
                         res[name] = result
                     pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)
                     if pred_nms.shape[0]>0:
-                       print(pred_nms[0])
+                       ##print(pred_nms[0])
                     name = info['img_id'][b]
                     size = info['size'][b]
                     pad = info['pad'][b]
-                    print(name)
-                    print(pad)
+                    ##print(name)
+                    ##print(pad)
                     gt = labels[labels[:,0]==b,1:].reshape(-1,5)                   
                     pred_nms[:,:4]*=size
                     pred_nms[:,0] -= pad[1]
                     pred_nms[:,1] -= pad[0]
                     if pred_nms.shape[0]>0:
-                       print(pred_nms[0])
+                       ##print(pred_nms[0])
                     count+=1
                     for th in batch_metrics:
                         batch_metrics[th].append(cal_tp_per_item(pred_nms,gt,th))
-                exit()
+                ##exit()
         metrics = {}
         for th in batch_metrics:
             tps,scores,pd_labels = [np.concatenate(x, 0) for x in list(zip(*batch_metrics[th]))]

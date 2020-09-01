@@ -297,14 +297,14 @@ def cal_tp_per_item(pds,gts,threshold=0.5):
     n = pds.shape[0]
     tps = np.zeros(n)
     labels = np.unique(gts[:,0].astype(np.int))
-    print(len(labels))
+    ##print(len(labels))
     for c in labels:
         mask_pd = pds[:,-1] == c
         pdbboxes = pds[mask_pd,:4].reshape(-1,4)
         gtbboxes = gts[gts[:,0] == c,1:].reshape(-1,4)
-        print(voc_indices[int(c)])
-        print(pdbboxes)
-        print(gtbboxes)
+        ##print(voc_indices[int(c)])
+        ##print(pdbboxes)
+        ##print(gtbboxes)
         nc = pdbboxes.shape[0]
         mc = gtbboxes.shape[0]
         tpsc = np.zeros(nc)
@@ -316,7 +316,7 @@ def cal_tp_per_item(pds,gts,threshold=0.5):
             ious = iou_wt_center_np(pdbbox,gtbboxes)
             iou = ious.max()
             best = ious.argmax()
-            print(iou)
+            ##print(iou)
             if iou >=threshold  and selected[best] !=1:
                 selected[best] = 1
                 tpsc[i] = 1
