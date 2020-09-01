@@ -221,7 +221,7 @@ class Trainer:
                         result = [pds_,pad]
                         res[name] = result
                     pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)
-                    if pred_nms.shape[0]>0:
+                    ##if pred_nms.shape[0]>0:
                        ##print(pred_nms[0])
                     name = info['img_id'][b]
                     size = info['size'][b]
@@ -232,7 +232,7 @@ class Trainer:
                     pred_nms[:,:4]*=size
                     pred_nms[:,0] -= pad[1]
                     pred_nms[:,1] -= pad[0]
-                    if pred_nms.shape[0]>0:
+                    ##if pred_nms.shape[0]>0:
                        ##print(pred_nms[0])
                     count+=1
                     for th in batch_metrics:
