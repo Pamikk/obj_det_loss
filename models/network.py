@@ -10,10 +10,11 @@ def init_weights(m):
     elif type(m) == nn.BatchNorm2d:
         torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
         torch.nn.init.constant_(m.bias.data, 0.0)
-def NetAPI(cfg,net):
+def NetAPI(cfg,net,init=False):
     networks = {'yolo':YOLO,'yolo_spp':YOLO_SPP}
     network = networks[net](cfg)
-    #network.apply(init_weights)
+    if init:
+        network.apply(init_weights)
     return network
 
 class NonResidual(nn.Module):
