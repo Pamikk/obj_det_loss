@@ -39,7 +39,7 @@ def main(args,cfgs):
         #metrics = det.validate(det.start-1,mode='val')        
         #det.logger.write_metrics(det.start-1,metrics,[])
         metrics = det.validate(det.start-1,mode='train')
-        #det.logger.write_metrics(det.start-1,metrics,[],mode='Trainval')
+        det.logger.write_metrics(det.start-1,metrics,[],mode='Trainval')
     elif args.mode=='test':
         det.test()
     else:

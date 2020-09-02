@@ -11,8 +11,9 @@ import json
 from utils import Logger
 from utils import non_maximum_supression as nms
 from utils import cal_tp_per_item,ap_per_class
-tosave=['mAP']
-thresholds = [0.5,0.75,0.95]
+tosave = ['mAP']
+plot = [0.5,0.75] 
+thresholds = np.around(np.arange(0.5,0.96,0.05),2)
 class Trainer:
     def __init__(self,cfg,datasets,net,loss,epoch):
         self.cfg = cfg
@@ -31,7 +32,7 @@ class Trainer:
         self.checkpoints = os.path.join(cfg.checkpoint,name)
         self.device = cfg.device
         self.net = self.net
-        self.optimizer = optim.SGD(self.net.parameters(),lr=cfg.lr,momentum=cfg.momentum,weight_decay=cfg.weight_decay)
+        self.optimizer = optim.Adam(self.net.parameters(),lr=cfg.lr,weight_decay=cfg.weight_decay)
         self.lr_sheudler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,mode='min', factor=cfg.lr_factor, threshold=0.0001,patience=cfg.patience,min_lr=cfg.min_lr)
         if not(os.path.exists(self.checkpoints)):
             os.mkdir(self.checkpoints)
@@ -77,7 +78,7 @@ class Trainer:
         for name in files:
             if name[-3:]=='.pt':
                 epoch = name[6:-3]
-                if epoch=='best':
+                if epoch=='best' or epoch=='bestm':
                   continue
                 idx = max(idx,int(epoch))
         if idx==0:
@@ -207,7 +208,9 @@ class Trainer:
         with torch.no_grad():
             mAP = 0
             count = 0
-            batch_metrics = dict.fromkeys(thresholds,[])
+            batch_metrics={}
+            for th in thresholds:
+                batch_metrics[th] = []
             gt_labels = []
             for _,data in tqdm(enumerate(valset)):
                 inputs,labels,info = data
@@ -225,7 +228,7 @@ class Trainer:
                         res[name] = result
                     pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)
                     ##if pred_nms.shape[0]>0:
-                       ##print(pred_nms[0])
+                      ## print(pred_nms[0])
                     name = info['img_id'][b]
                     size = info['size'][b]
                     pad = info['pad'][b]
@@ -236,19 +239,19 @@ class Trainer:
                     pred_nms[:,0] -= pad[1]
                     pred_nms[:,1] -= pad[0]
                     ##if pred_nms.shape[0]>0:
-                       ##print(pred_nms[0])
+                      ## print(pred_nms[0])
                     count+=1
                     for th in batch_metrics:
                         batch_metrics[th].append(cal_tp_per_item(pred_nms,gt,th))
-                ##exit()
         metrics = {}
         for th in batch_metrics:
             tps,scores,pd_labels = [np.concatenate(x, 0) for x in list(zip(*batch_metrics[th]))]
             precision, recall, AP,_,_ = ap_per_class(tps, scores, pd_labels, gt_labels)
             mAP += np.mean(AP)
-            metrics['AP/'+str(th)] = np.mean(AP)
-            metrics['Precision/'+str(th)] = np.mean(precision)
-            metrics['Recall/'+str(th)] = np.mean(recall)
+            if th in plot:
+                metrics['AP/'+str(th)] = np.mean(AP)
+                metrics['Precision/'+str(th)] = np.mean(precision)
+                metrics['Recall/'+str(th)] = np.mean(recall)
         metrics['mAP'] = mAP/len(thresholds)
         if save:
             json.dump(res,open(os.path.join(self.predictions,'pred_epoch_'+str(epoch)+'.json'),'w'))

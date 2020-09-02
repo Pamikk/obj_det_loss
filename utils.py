@@ -230,7 +230,7 @@ def ap_per_class(tp, conf, pred_cls, target_cls):
 
     # Create Precision-Recall curve and compute AP for each class
     ap, p, r = [], [], []
-    for c in tqdm(unique_classes, desc="Computing AP"):
+    for c in unique_classes:
         i = pred_cls == c
         n_gt = (target_cls == c).sum()  # Number of ground truth objects
         n_p = i.sum()  # Number of predicted objects
@@ -299,15 +299,14 @@ def cal_tp_per_item(pds,gts,threshold=0.5):
     labels = np.unique(gts[:,0].astype(np.int))
     ##print(len(labels))
     for c in labels:
-        mask_pd = pds[:,-1] == c
-        pdbboxes = pds[mask_pd,:4].reshape(-1,4)
+        pd_idx = np.where(pds[:-1]==c)[0]
+        pdbboxes = pds[pd_idx,:4].reshape(-1,4)
         gtbboxes = gts[gts[:,0] == c,1:].reshape(-1,4)
         ##print(voc_indices[int(c)])
         ##print(pdbboxes)
         ##print(gtbboxes)
         nc = pdbboxes.shape[0]
         mc = gtbboxes.shape[0]
-        tpsc = np.zeros(nc)
         selected = np.zeros(mc)
         for i in range(nc):
             if mc == 0:
@@ -319,9 +318,8 @@ def cal_tp_per_item(pds,gts,threshold=0.5):
             ##print(iou)
             if iou >=threshold  and selected[best] !=1:
                 selected[best] = 1
-                tpsc[i] = 1
+                tps[pd_idx[i]] = 1.0
                 mc -=1
-        tps[mask_pd][tpsc==1] = 1
     return [tps,pds[:,-2]*pds[:,-3],pds[:,-1]]    
 
     
@@ -362,7 +360,6 @@ def cal_metrics_wo_cls(pd,gt,threshold=0.5):
         return 0,0,0
     else:
         return 1,1,1
-
     
 def non_maximum_supression(preds,conf_threshold=0.5,nms_threshold = 0.4):
     preds = preds[preds[:,4]>conf_threshold]

@@ -24,7 +24,7 @@ class Config:
         self.obj_scale = 2.5
         self.noobj_scale = 0.5
         self.ignore_threshold = 0.7
-        self.bs = 8        
+        self.bs = 2       
         self.pre_trained_path = '../network_weights'
         if mode=='train':
             self.file='./pre_data/train.json'
