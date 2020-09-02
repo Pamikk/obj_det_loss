@@ -6,13 +6,14 @@ import os
 from .backbone import ResNet,conv1x1,conv3x3,Darknet 
 def init_weights(m):
     if type(m) == nn.Conv2d:
-        torch.nn.init.kaiming_uniform_(m.weight)
-        if type(m.bias)==type(m.weight):
-            torch.nn.init.constant_(m.bias,0.01)
+        torch.nn.init.normal_(m.weight.data, 0.0, 0.02)
+    elif type(m) == nn.BatchNorm2d:
+        torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
+        torch.nn.init.constant_(m.bias.data, 0.0)
 def NetAPI(cfg,net):
     networks = {'yolo':YOLO,'yolo_spp':YOLO_SPP}
     network = networks[net](cfg)
-    network.apply(init_weights)
+    #network.apply(init_weights)
     return network
 
 class NonResidual(nn.Module):

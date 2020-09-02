@@ -126,8 +126,7 @@ class VOC_dataset(data.Dataset):
             return data,labels      
         else:
             #validation set
-            scale = 256#int(round(h/16)*16)
-            img = resize(img,(scale,scale))
+            img = resize(img,(self.cfg.size,self.cfg.size))
             data = self.img_to_tensor(img)
             info ={'size':h,'img_id':name,'pad':pad}
             if self.mode=='val':

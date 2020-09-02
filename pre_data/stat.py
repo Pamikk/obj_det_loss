@@ -60,19 +60,23 @@ class kmeans(object):
                 return self.iter(num+1)
     def print_cs(self):
         for i in range(self.k):
-            print(list(self.centers[i]),np.sum(self.assign==i))
-        print(self.cal_distance(self.centers,self.centers))
+            print(round(self.centers[i,0],3),round(self.centers[i,1],3),np.sum(self.assign==i))
+        centers = np.sort(np.around(self.centers,3),axis=0)        
+        print([list(c) for c in centers])
+        print(self.cal_distance(centers,centers))
+
+        
     def get_cluster(self,idx):
         assert idx < self.k
         return self.vals[self.assign==idx]
 class kmeans_mse(kmeans):
     def cal_distance(self,obj1,obj2):
-        dis = ((obj2.max(1)-obj1.max())**2).reshape(self.k,-1).sum(1)
+        dis = ((obj2[:,0]*obj2[:,1]-obj1[0]*obj1[1])).reshape(self.k,-1).sum(1)
         return dis
     def print_cs(self):
         for i in range(self.k):
             print(self.centers[i,0],np.sum(self.assign==i))
-def anaylze_scale_and_ratio(annos):
+def analyze_scale_and_ratio(annos):
     allb = []
     for name in annos:
         size = annos[name]['size']
@@ -80,7 +84,7 @@ def anaylze_scale_and_ratio(annos):
         for anno in annos[name]['annotation']:
             xmin,ymin,xmax,ymax = anno['bbox']
             bw,bh = xmax-xmin,ymax-ymin
-            t = max(w,h)
+            t = 1#max(w,h)
             allb.append((bw/t,bh/t))
     scale_km = kmeans_mse(allb,k=3)
     scale_km.initialization()
@@ -117,13 +121,13 @@ def analyze_hw(annos):
         for anno in annos[name]['annotation']:
             xmin,ymin,xmax,ymax = anno['bbox']
             bw,bh = xmax-xmin,ymax-ymin
-            t = max(w,h)
+            t = 1#max(w,h)
             allb.append((bw/t,bh/t))
             mh = min(mh,bh)
             mxh = max(mxh,bh)
             mw = min(mw,bw)
             mxw = max(mxw,bw)
-    km = kmeans(allb,k=9,max_iters=500)
+    km = kmeans(allb,k=6,max_iters=500)
     km.initialization()
     km.iter(0)  
     print(mh,mw,mxh,mxw)
@@ -169,7 +173,7 @@ def analyze_size(annos):
 path ='annotation.json'
 
 annos = json.load(open(path,'r'))
-analyze_obj_num(annos)
+analyze_hw(annos)
 #img size:
 #96 100 500 500
 #overlap
@@ -189,6 +193,5 @@ anchors = [[0.04567562487013612, 0.04877678367694419],[0.05375224461038032, 0.10
 anchors = [[0.053458141269278926, 0.07862022420023637],[0.1444091477545787, 0.11565781451235851],[0.1151994735538117, 0.24522582628542158],
            [0.31460831063222794, 0.2242885185476659],[0.21583068081593598, 0.4268351012487999],[0.38056995625914797, 0.5435495510304343],
            [0.6648272903930105, 0.3314712916726237],[0.5931101292049206, 0.7206548935846065],[0.8799995870003063, 0.5926446052236977]]
-anchors = [[26.619310998735777, 39.15455120101138],[71.77704517704518, 57.77313797313797],[57.81336725254394, 122.58395004625346],
-           [156.65975718092983, 111.81196328101865],[107.69161406672679, 212.91523895401264],[190.1323076923077, 270.1545299145299],
-           [329.9393296563428, 164.39669070852779],[296.2381738173817, 358.98624862486247],[438.50071873502634, 293.79731672256827]]
+anchors = [[0.057, 0.078], [0.102, 0.119], [0.169, 0.235], [0.246, 0.256], [0.25, 0.278], [0.447, 0.454], [0.559, 0.483], [0.791, 0.604], [0.794, 0.724]]
+anchors  =[[28.112, 38.894], [51.368, 59.001], [83.605, 117.711], [122.2, 125.505], [123.953, 139.515], [219.663, 227.468], [280.433, 237.059], [391.719, 298.828], [395.413, 361.471]]

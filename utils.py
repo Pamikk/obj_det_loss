@@ -322,7 +322,7 @@ def cal_tp_per_item(pds,gts,threshold=0.5):
                 tpsc[i] = 1
                 mc -=1
         tps[mask_pd][tpsc==1] = 1
-    return [tps,pds[:,-2],pds[:,-1]]    
+    return [tps,pds[:,-2]*pds[:,-3],pds[:,-1]]    
 
     
 
@@ -363,7 +363,6 @@ def cal_metrics_wo_cls(pd,gt,threshold=0.5):
     else:
         return 1,1,1
 
-
     
 def non_maximum_supression(preds,conf_threshold=0.5,nms_threshold = 0.4):
     preds = preds[preds[:,4]>conf_threshold]
@@ -372,11 +371,8 @@ def non_maximum_supression(preds,conf_threshold=0.5,nms_threshold = 0.4):
     score = preds[:,4]*preds[:,5:].max(1)[0]
     idx = torch.argsort(score,descending=True)
     preds = preds[idx]
-    preds = preds[score[idx] >= conf_threshold]    
-    if len(preds) == 0:
-        return preds 
     cls_confs,cls_labels = torch.max(preds[:,5:],dim=1,keepdim=True)
-    dets = torch.cat((preds[:,:4],preds[:,4].reshape(-1,1)*cls_confs,cls_labels.float()),dim=1)
+    dets = torch.cat((preds[:,:5],cls_confs,cls_labels.float()),dim=1)
     keep = []
     while len(dets)>0:
         mask = dets[0,-1]==dets[:,-1]
@@ -388,15 +384,17 @@ def non_maximum_supression(preds,conf_threshold=0.5,nms_threshold = 0.4):
         mask = mask & (ious>nms_threshold)
         #hard-nms        
         dets = dets[~mask]
-    return torch.stack(keep).reshape(-1,6)
+    return torch.stack(keep).reshape(-1,7)
 def non_maximum_supression_soft(preds,conf_threshold=0.5,nms_threshold=0.4):
     keep = []
     cls_confs,cls_labels = torch.max(preds[:,5:],dim=1,keepdim=True)
-    dets = torch.cat((preds[:,:4],preds[:,4].reshape(-1,1)*cls_confs,cls_labels.float()),dim=1)
+    dets = torch.cat((preds[:,:5],cls_confs,cls_labels.float()),dim=1)
     dets = dets[dets[:,4]>conf_threshold]
     while len(dets)>0:
         _,idx = torch.max(dets[:,4]*dets[:,5],dim=0)
-        val = dets[:,4]        
+        val = dets[:,4]
+        if val<=conf_threshold:
+            continue        
         pd = dets[idx]
         dets = torch.cat((dets[:idx],dets[idx+1:]))
         ious = iou_wt_center(pd[:4],dets[:,:4])
@@ -404,7 +402,7 @@ def non_maximum_supression_soft(preds,conf_threshold=0.5,nms_threshold=0.4):
         keep.append(pd)
         dets[mask,4] *= (1-ious[mask])*(1-val)
         dets = dets[dets[:,4]>conf_threshold]
-    return torch.stack(keep).reshape(-1,6)
+    return torch.stack(keep).reshape(-1,7)
 
 
 

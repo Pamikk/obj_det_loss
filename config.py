@@ -8,22 +8,23 @@ class Config:
         self.checkpoint='../checkpoints'
         self.cls_num = 20        
         self.res = 50
-        self.sizes = [384,416,448]
-        self.sizes_w = [1,1,1]
+        self.size = 416
+        self.sizes = list(range(self.size-32*3,self.size-32*3+1,32)) + [self.size]
+        self.sizes_w = [1]*len(self.sizes)
+        self.sizes_w[-1]+=3  
         self.nms_threshold = 0.5
-        self.dc_threshold = 0.4
+        self.dc_threshold = 0.1
+        
         #loss args
         #self.anchors = [[0.26533935,0.33382434],[0.66550966,0.56042827],[0.0880948,0.11774004]] #w,h normalized by max size
         #self.anchors = [[0.76822971,0.57259308],[0.39598597,0.47268035],[0.20632625,0.26720238],[0.07779112,0.10330848]] 
-        self.anchors = [[0.053458141269278926, 0.07862022420023637],[0.1444091477545787, 0.11565781451235851],[0.1151994735538117, 0.24522582628542158],
-           [0.31460831063222794, 0.2242885185476659],[0.21583068081593598, 0.4268351012487999],[0.38056995625914797, 0.5435495510304343],
-           [0.6648272903930105, 0.3314712916726237],[0.5931101292049206, 0.7206548935846065],[0.8799995870003063, 0.5926446052236977]]
-        self.anchor_divide=[(6,7,8),(3,4,5),(0,1,2)]
+        self.anchors=[[34.3, 41.965], [66.143, 110.928], [149.002, 121.749], [152.413, 174.758], [330.323, 261.792], [364.985, 331.075]]
+        self.anchor_divide=[(4,5),(2,3),(0,1)]
         self.anchor_num = len(self.anchors)
         self.obj_scale = 2.5
         self.noobj_scale = 0.5
         self.ignore_threshold = 0.7
-        self.bs = 3        
+        self.bs = 8        
         self.pre_trained_path = '../network_weights'
         if mode=='train':
             self.file='./pre_data/train.json'
