@@ -371,10 +371,7 @@ def non_maximum_supression(preds,conf_threshold=0.5,nms_threshold = 0.4):
     score = preds[:,4]*preds[:,5:].max(1)[0]
     idx = torch.argsort(score,descending=True)
     preds = preds[idx]
-    print(preds[:,5:].shape)
     cls_confs,cls_labels = torch.max(preds[:,5:],dim=1,keepdim=True)
-    print(cls_confs.max(),cls_labels.max())
-    exit()
     dets = torch.cat((preds[:,:5],cls_confs,cls_labels.float()),dim=1)
     keep = []
     while len(dets)>0:

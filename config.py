@@ -12,8 +12,8 @@ class Config:
         self.sizes =  [self.size] #+ list(range(self.size-32*3,self.size-32*3+1,32)) 
         self.sizes_w = [1]*len(self.sizes)
         self.sizes_w[0]+=3  
-        self.nms_threshold = 0.3
-        self.dc_threshold = 0.1
+        self.nms_threshold = 0.5
+        self.dc_threshold = 0.4
         
         #loss args
         #self.anchors = [[0.26533935,0.33382434],[0.66550966,0.56042827],[0.0880948,0.11774004]] #w,h normalized by max size
@@ -21,10 +21,10 @@ class Config:
         self.anchors=[[28.112, 38.894], [51.368, 59.001], [83.605, 117.711], [122.2, 125.505], [123.953, 139.515], [219.663, 227.468], [280.433, 237.059], [391.719, 298.828], [395.413, 361.471]]
         self.anchor_divide=[(6,7,8),(3,4,5),(0,1,2)]
         self.anchor_num = len(self.anchors)
-        self.obj_scale = 2.5
+        self.obj_scale = 1.5
         self.noobj_scale = 0.5
         self.ignore_threshold = 0.7
-        self.bs = 2       
+        self.bs = 8       
         self.pre_trained_path = '../network_weights'
         if mode=='train':
             self.file='./pre_data/train.json'
