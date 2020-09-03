@@ -39,8 +39,8 @@ class Config:
         self.cls_num = 20        
         self.res = 50
         self.size = 416
-        self.multiscale = 1
-        self.sizes = list(range(self.size-32*self.multiscale,self.size-32*self.multiscale+1,32)) 
+        self.multiscale = 3
+        self.sizes = list(range(self.size-32*self.multiscale,self.size+32*self.multiscale+1,32)) 
         self.nms_threshold = 0.5
         self.dc_threshold = 0.4
         
@@ -60,7 +60,7 @@ class Config:
         self.bs = 8       
         self.pre_trained_path = '../network_weights'
         if mode=='train':
-            self.file='./data/train.json'
+            self.file='./data/trainval.json'
             self.bs = 32 # batch size
             self.flip = False
             #augmentation parameter

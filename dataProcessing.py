@@ -150,10 +150,10 @@ class VOC_dataset(data.Dataset):
             data = torch.stack(data)
         elif self.mode=='train':
             data,labels = list(zip(*batch))
-            if self.accm_batch % 10 == 0:
+            if self.accm_batch % 5 == 0:
                 self.size = random.choice(self.cfg.sizes)
             tsize = (self.size,self.size)
-            self.accm_batch+=1
+            self.accm_batch += 1
             data = torch.stack([F.interpolate(img.unsqueeze(0),tsize,mode='bilinear').squeeze(0) for img in data]) #multi-scale-training   
         tmp =[]
                    
