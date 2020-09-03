@@ -26,7 +26,7 @@ def stack_list(lists):
         res[k] = torch.stack([obj[k] for obj in lists])
     return res
 
-def brightness_scale(src,vs):
+def valid_scale(src,vs):
     img = cv2.cvtColor(src,cv2.COLOR_RGB2HSV).astype(np.float)
     img[:,:,2] *= (1+vs)
     img[:,:,2][img[:,:,2]>255] = 255
@@ -72,6 +72,8 @@ class VOC_dataset(data.Dataset):
         self.imgs = list(data.keys())
         self.annos = data
         self.mode = mode
+        self.accm_batch = 0
+        self.size = random.choice(cfg.sizes)
     def __len__(self):
         return len(self.imgs)
 
@@ -84,11 +86,13 @@ class VOC_dataset(data.Dataset):
         gts = torch.zeros((anno['obj_num'],5),dtype=torch.float)
         if anno['obj_num'] == 0:
             return gts
-        bboxs = anno['annotation']
-        for i in range(anno['obj_num']):
-            gts[i,0] = bboxs[i]['label']
-            x1,y1,x2,y2 = bboxs[i]['bbox']
-            gts[i,1:] =torch.tensor([(x1+x2)/2-1,(y1+y2)/2-1,x2-x1,y2-y1],dtype=torch.float)
+        labels = torch.tensor(anno['labels']) #ignore hard
+        assert labels.shape[-1] == 6
+        gts[:,0] =  labels[:,0]
+        gts[:,1] = (labels[:,1]+labels[:,3])/2
+        gts[:,2] = (labels[:,2]+labels[:,4])/2
+        gts[:,3] = labels[:,3] - labels[:,1]
+        gts[:,4] = labels[:,4] -labels[:,2]
         return gts
         
     def normalize_gts(self,labels,size):
@@ -146,9 +150,10 @@ class VOC_dataset(data.Dataset):
             data = torch.stack(data)
         elif self.mode=='train':
             data,labels = list(zip(*batch))
-            #ratio = random.choice(ratios)
-            scale = random.choices(self.cfg.sizes,self.cfg.sizes_w)[0]
-            tsize = (scale,scale)
+            if self.accm_batch % 10 == 0:
+                self.size = random.choice(self.cfg.sizes)
+            tsize = (self.size,self.size)
+            self.accm_batch+=1
             data = torch.stack([F.interpolate(img.unsqueeze(0),tsize,mode='bilinear').squeeze(0) for img in data]) #multi-scale-training   
         tmp =[]
                    

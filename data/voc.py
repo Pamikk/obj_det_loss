@@ -36,13 +36,14 @@ def get_one_anno(path):
     for obj in objs:
         item={}
         name=obj.find('name').text
-        item['label'] = voc_classes[name]-1#ignore background
-        assert item['label']>=0
-        bndbx = obj.find('bndbox')
-        item['bbox'] = get_all_cont(bndbx,float)
-        item['hard'] = int(obj.find('difficult').text)
+        label = voc_classes[name]-1#ignore background
+        assert label>=0
+        bbox= obj.find('bndbox')
+        bbox = get_all_cont(bbox,float)
+        hard = int(obj.find('difficult').text)
+        item = [label]+bbox+[hard]
         objects.append(item)
-    anno['annotation'] = objects
+    anno['labels'] = objects
     return anno
 def get_annotations(anno_dir):
     files = get_anno_files(anno_dir)
@@ -75,9 +76,9 @@ def split_annotation(anno,split_path):
     return test,train,val,trainval  
 
 anno_path = '../../dataset/VOCdevkit/VOC2007/Annotations'
-#annos = get_annotations(anno_path)
-#json.dump(annos,open('annotation.json','w'))
-annos = json.load(open('annotation.json','r'))
+annos = get_annotations(anno_path)
+json.dump(annos,open('annotation_voc07.json','w'))
+#annos = json.load(open('annotation_voc07.json','r'))
 
 split_path = '../../dataset/VOCdevkit/VOC2007/ImageSets/Main'
 test,train,val,trainval = split_annotation(annos,split_path)

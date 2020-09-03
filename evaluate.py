@@ -11,15 +11,17 @@ def gen_gts(anno):
     gts = torch.zeros((anno['obj_num'],5),dtype=torch.float)
     if anno['obj_num'] == 0:
         return gts
-    bboxs = anno['annotation']
-    for i in range(anno['obj_num']):
-        gts[i,0] = bboxs[i]['label']
-        x1,y1,x2,y2 = bboxs[i]['bbox']
-        gts[i,1:] =torch.tensor([(x1+x2)/2-1,(y1+y2)/2-1,x2-x1,y2-y1],dtype=torch.float)
+    labels = torch.tensor(anno['labels']) #ignore hard
+    assert labels.shape[-1] == 6
+    gts[:,0] =  labels[:,0]
+    gts[:,1] = (labels[:,1]+labels[:,3])/2
+    gts[:,2] = (labels[:,2]+labels[:,4])/2
+    gts[:,3] = labels[:,3] - labels[:,1]
+    gts[:,4] = labels[:,4] -labels[:,2]
     return gts
 cfg = Config(mode='trainval')
 gts = json.load(open(cfg.file))
-nms_threshold = 0.3
+nms_threshold = 0.5
 conf_threshold = 0
 tosave = ['mAP']
 plot = [0.5,0.75] 
@@ -32,14 +34,13 @@ for th in thresholds:
     batch_metrics[th] = []
 gt_labels = []
 for i,img in tqdm(enumerate(gts.keys())):
-    pred_nms = torch.tensor(pds[img])
+    pred = torch.tensor(pds[img])
     gt = gen_gts(gts[img])
     gt_labels += gt[:,0].tolist()  
-    #pred_nms = nms(pred,conf_threshold, nms_threshold)
+    pred_nms = nms(pred,conf_threshold, nms_threshold)
     total = 0
     for th in batch_metrics:
         batch_metrics[th].append(cal_tp_per_item(pred_nms,gt,th))
-    exit()
 metrics = {}
 for th in batch_metrics:
     tps,scores,pd_labels = [np.concatenate(x, 0) for x in list(zip(*batch_metrics[th]))]

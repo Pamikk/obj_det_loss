@@ -14,31 +14,7 @@ from utils import cal_tp_per_item,ap_per_class
 tosave = ['mAP']
 plot = [0.5,0.75] 
 thresholds = np.around(np.arange(0.5,0.96,0.05),2)
-def rescale_boxes(boxes_, current_dim, original_shape):
-    """ Rescales bounding boxes to the original shape """
-    boxes = boxes.clone()
-    boxes[:,0] = boxes_[:,0] - boxes_[:,2]/2
-    boxes[:,1] = boxes_[:,1] - boxes_[:,3]/2
-    boxes[:,2] = boxes_[:,0] + boxes_[:,2]/2
-    boxes[:,3] = boxes_[:,1] + boxes_[:,3]/2
-    orig_h, orig_w = original_shape
-    # The amount of padding that was added
-    pad_x = max(orig_h - orig_w, 0) * (current_dim / max(original_shape))
-    pad_y = max(orig_w - orig_h, 0) * (current_dim / max(original_shape))
-    # Image height and width after padding is removed
-    unpad_h = current_dim - pad_y
-    unpad_w = current_dim - pad_x
-    # Rescale bounding boxes to dimension of original image
-    boxes[:, 0] = ((boxes[:, 0] - pad_x // 2) / unpad_w) * orig_w
-    boxes[:, 1] = ((boxes[:, 1] - pad_y // 2) / unpad_h) * orig_h
-    boxes[:, 2] = ((boxes[:, 2] - pad_x // 2) / unpad_w) * orig_w
-    boxes[:, 3] = ((boxes[:, 3] - pad_y // 2) / unpad_h) * orig_h
 
-    boxes_[:,0] = (boxes[:,0] + boxes[:,2])/2
-    boxes_[:,1] = (boxes[:,1] + boxes[:,3])/2
-    boxes_[:,2] = boxes[:,2] - boxes[:,0]
-    boxes_[:,3] = boxes[:,3] - boxes[:,1]
-    return boxes_
 class Trainer:
     def __init__(self,cfg,datasets,net,loss,epoch):
         self.cfg = cfg
@@ -162,6 +138,7 @@ class Trainer:
         running_loss ={'xy':0.0,'wh':0.0,'conf':0.0,'cls':0.0,'obj':0.0,'all':0.0,'iou':0.0,'gou':0.0}
         self.net.train()
         n = len(self.trainset)
+        self.loss.not_match = 0
         for i,data in tqdm(enumerate(self.trainset)):
             inputs,labels = data
             outs = self.net(inputs.to(self.device).float())
@@ -181,6 +158,7 @@ class Trainer:
                 self.optimizer.zero_grad()
             del loss
         self.logMemoryUsage()
+        print(f'#Gt not matched:{self.loss.not_match}')
         return running_loss
     def train(self):
         print("strat train:",self.name)
@@ -209,15 +187,16 @@ class Trainer:
                 metrics = self.validate(epoch,'val',self.save_pred)
                 self.logger.write_metrics(epoch,metrics,tosave)
                 mAP = metrics['mAP']
-                self._updateMetrics(mAP,epoch)
                 if mAP >= self.best_mAP:
                     self.best_mAP = mAP
                     self.best_mAP_epoch = epoch
                     self.save_epoch('best',epoch)
-                print("best so far with:",self.best_mAP)
+                print(f"best so far with {self.best_mAP} at epoch:{self.best_mAP_epoch}")
                 if self.trainval:
                     metrics = self.validate(epoch,'train',self.save_pred)
                     self.logger.write_metrics(epoch,metrics,tosave,mode='Trainval')
+                    mAP = metrics['mAP']
+                    self._updateMetrics(mAP,epoch)
             epoch +=1
                 
         print("Best mAP: {:.4f} at epoch {}".format(self.best_mAP, self.best_mAP_epoch))

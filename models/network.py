@@ -41,7 +41,7 @@ class YOLO(nn.Module):
     def __init__(self,cfg):
         super(YOLO,self).__init__()
         self.encoders = Darknet(os.path.join(cfg.pre_trained_path,'yolov3.weights'))
-        self.out_channels = self.encoders.out_channels
+        self.out_channels = self.encoders.out_channels.copy()
         self.in_channel = self.out_channels.pop(0)
         self.relu = nn.LeakyReLU(0.1)
         decoders = []
@@ -54,7 +54,8 @@ class YOLO(nn.Module):
         if upsample:
             upsample = nn.Sequential(conv1x1(self.in_channel,channel),nn.BatchNorm2d(channel),
                                            self.relu,nn.Upsample(scale_factor=2,mode='bilinear'))
-            self.in_channel = channel + self.out_channels.pop(0)
+            cat_channel = self.out_channels.pop(0)
+            self.in_channel = channel + cat_channel
         else:
             upsample = nn.Identity()
         decoders=[block(self.in_channel,channel),block(channel*block.multiple,channel)]
@@ -67,22 +68,21 @@ class YOLO(nn.Module):
         feats = self.encoders(x)
         #channels:[1024,512,256,128,64]
         #spatial :[8,16,32,64,128] suppose inp is 256
-        outs = []
+        outs = list(range(len(self.decoders)))
         x = feats.pop(0)
         y = []
-        for decoders in self.decoders:
+        for i,decoders in enumerate(self.decoders):
             up,decoder,pred = decoders
             x = torch.cat([up(x)]+y,dim=1)
             x = decoder(x)
             out = pred(x)
-            outs.append(out)
+            outs[i] = out
             y = [feats.pop(0)]
         return outs
 class YOLO_SPP(YOLO):
     def __init__(self,cfg):
         super(YOLO_SPP,self).__init__(cfg)
-        self.encoders = Darknet(os.path.join(cfg.pre_trained_path,'yolov3-spp.weights'))
-        self.out_channels = self.encoders.out_channels
+        self.out_channels = self.encoders.out_channels.copy()
         self.in_channel = self.out_channels.pop(0)
         self.relu = nn.LeakyReLU(0.1)
         decoders = []
