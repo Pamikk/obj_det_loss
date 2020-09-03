@@ -159,6 +159,7 @@ class Trainer:
             del loss
         self.logMemoryUsage()
         print(f'#Gt not matched:{self.loss.not_match}')
+        self.loss.reset_notmatch()
         return running_loss
     def train(self):
         print("strat train:",self.name)
