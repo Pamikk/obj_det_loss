@@ -114,7 +114,9 @@ class YOLOLossv3(nn.Module):
         nb = pred.shape[0]        
         if infer:
             pd_bboxes[...,[0,2]]/=self.grid_size[1]
-            pd_bboxes[...,[1,3]]/=self.grid_size[0]     
+            pd_bboxes[...,[1,3]]/=self.grid_size[0]
+            #pd_bboxes[...,[0,2]]*=self.stride[1]
+            #pd_bboxes[...,[1,3]]*=self.stride[0]       
             return torch.cat((pd_bboxes.view(nb,-1,4),conf.view(nb,-1,1),cls_score.view(nb,-1,self.cls_num)),dim=-1)
         else:
             pds_bbox = (xs,ys,ws,hs,pd_bboxes)
@@ -157,7 +159,7 @@ class YOLOLossv3(nn.Module):
         nb,_,nh,nw = out.shape
         self.device ='cuda' if out.is_cuda else 'cpu'
         self.grid_size = (nh,nw)
-        self.stride = (size[0]//nh,size[1]//nw)
+        self.stride = (size[0]/nh,size[1]/nw)
         pred = out.view(nb,self.num_anchors,self.cls_num+5,nh,nw).permute(0,1,3,4,2).contiguous()
         #reshape to nB,nA,nH,nW,bboxes
         self.scaled_anchors = torch.tensor([(a_w / self.stride[1], a_h / self.stride[0]) for a_w, a_h in self.anchors],dtype=torch.float,device=self.device)
@@ -262,9 +264,9 @@ class LossAPI(nn.Module):
             for out,loss in zip(outs,self.bbox_losses): 
                ret,total = loss(out,gt,size)
                for k in ret:
-                   res[k] +=ret[k]/len(self.bbox_losses)
+                   res[k] +=ret[k]
                totals.append(total)
-            return res,torch.stack(totals).mean()
+            return res,torch.stack(totals).sum()
 
 
 

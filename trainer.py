@@ -14,6 +14,31 @@ from utils import cal_tp_per_item,ap_per_class
 tosave = ['mAP']
 plot = [0.5,0.75] 
 thresholds = np.around(np.arange(0.5,0.96,0.05),2)
+def rescale_boxes(boxes_, current_dim, original_shape):
+    """ Rescales bounding boxes to the original shape """
+    boxes = boxes.clone()
+    boxes[:,0] = boxes_[:,0] - boxes_[:,2]/2
+    boxes[:,1] = boxes_[:,1] - boxes_[:,3]/2
+    boxes[:,2] = boxes_[:,0] + boxes_[:,2]/2
+    boxes[:,3] = boxes_[:,1] + boxes_[:,3]/2
+    orig_h, orig_w = original_shape
+    # The amount of padding that was added
+    pad_x = max(orig_h - orig_w, 0) * (current_dim / max(original_shape))
+    pad_y = max(orig_w - orig_h, 0) * (current_dim / max(original_shape))
+    # Image height and width after padding is removed
+    unpad_h = current_dim - pad_y
+    unpad_w = current_dim - pad_x
+    # Rescale bounding boxes to dimension of original image
+    boxes[:, 0] = ((boxes[:, 0] - pad_x // 2) / unpad_w) * orig_w
+    boxes[:, 1] = ((boxes[:, 1] - pad_y // 2) / unpad_h) * orig_h
+    boxes[:, 2] = ((boxes[:, 2] - pad_x // 2) / unpad_w) * orig_w
+    boxes[:, 3] = ((boxes[:, 3] - pad_y // 2) / unpad_h) * orig_h
+
+    boxes_[:,0] = (boxes[:,0] + boxes[:,2])/2
+    boxes_[:,1] = (boxes[:,1] + boxes[:,3])/2
+    boxes_[:,2] = boxes[:,2] - boxes[:,0]
+    boxes_[:,3] = boxes[:,3] - boxes[:,1]
+    return boxes_
 class Trainer:
     def __init__(self,cfg,datasets,net,loss,epoch):
         self.cfg = cfg
@@ -235,7 +260,7 @@ class Trainer:
                     ##print(name)
                     ##print(pad)
                     gt = labels[labels[:,0]==b,1:].reshape(-1,5)                   
-                    pred_nms[:,:4]*=size
+                    pred_nms[:,:4]*=max(size)
                     pred_nms[:,0] -= pad[1]
                     pred_nms[:,1] -= pad[0]
                     ##if pred_nms.shape[0]>0:
@@ -270,12 +295,14 @@ class Trainer:
                 for b in range(nB):
                     pred = pds[b].view(-1,self.cfg.cls_num+5)
                     name = info['img_id'][b]
-                    size = info['size'][b]
+                    tsize = info['size'][b]
                     pad = info['pad'][b]
-                    pred[:,:4]*=size
+                    pred[:,:4]*=max(tsize)
                     pred[:,0] -= pad[1]
-                    pred[:,1] -= pad[0]                    
-                    pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)
+                    pred[:,1] -= pad[0]
+                    cls_confs,cls_labels = torch.max(pred[:,5:],dim=1,keepdim=True)
+                    pred_nms = torch.cat((pred[:,:5],cls_confs,cls_labels.float()),dim=1)                    
+                    #pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)
                     pds_ = list(pred_nms.cpu().numpy().astype(float))
                     pds_ = [list(pd) for pd in pds_]
                     res[name] = pds_

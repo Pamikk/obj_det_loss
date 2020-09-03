@@ -297,6 +297,7 @@ def cal_tp_per_item(pds,gts,threshold=0.5):
     n = pds.shape[0]
     tps = np.zeros(n)
     labels = np.unique(gts[:,0].astype(np.int))
+    scores = pds[:,4]*pds[:,5]
     ##print(len(labels))
     for c in labels:
         pd_idx = np.where(pds[:-1]==c)[0]
@@ -308,6 +309,7 @@ def cal_tp_per_item(pds,gts,threshold=0.5):
         nc = pdbboxes.shape[0]
         mc = gtbboxes.shape[0]
         selected = np.zeros(mc)
+        sel_ious = np.zeros(mc)
         for i in range(nc):
             if mc == 0:
                 break
@@ -320,7 +322,8 @@ def cal_tp_per_item(pds,gts,threshold=0.5):
                 selected[best] = 1
                 tps[pd_idx[i]] = 1.0
                 mc -=1
-    return [tps,pds[:,-2]*pds[:,-3],pds[:,-1]]    
+                sel_ious[best] = iou           
+    return [tps,scores,pds[:,-1]]    
 
     
 
@@ -368,7 +371,10 @@ def non_maximum_supression(preds,conf_threshold=0.5,nms_threshold = 0.4):
     score = preds[:,4]*preds[:,5:].max(1)[0]
     idx = torch.argsort(score,descending=True)
     preds = preds[idx]
+    print(preds[:,5:].shape)
     cls_confs,cls_labels = torch.max(preds[:,5:],dim=1,keepdim=True)
+    print(cls_confs.max(),cls_labels.max())
+    exit()
     dets = torch.cat((preds[:,:5],cls_confs,cls_labels.float()),dim=1)
     keep = []
     while len(dets)>0:
@@ -399,6 +405,25 @@ def non_maximum_supression_soft(preds,conf_threshold=0.5,nms_threshold=0.4):
         keep.append(pd)
         dets[mask,4] *= (1-ious[mask])*(1-val)
         dets = dets[dets[:,4]>conf_threshold]
+    return torch.stack(keep).reshape(-1,7)
+def non_maximum_supression_eval(preds,conf_threshold=0.5,nms_threshold = 0.4):
+    preds = preds[preds[:,4]>conf_threshold]
+    if len(preds) == 0:
+        return preds      
+    score = preds[:,4]*preds[:,5]
+    idx = torch.argsort(score,descending=True)
+    dets = preds[idx]
+    keep = []
+    while len(dets)>0:
+        mask = dets[0,-1]==dets[:,-1]
+        new = dets[0]
+        keep.append(new)
+        ious = iou_wt_center(dets[0,:4],dets[:,:4])
+        if not(ious[0]>=0.7):
+            ious[0] = 1
+        mask = mask & (ious>nms_threshold)
+        #hard-nms        
+        dets = dets[~mask]
     return torch.stack(keep).reshape(-1,7)
 
 

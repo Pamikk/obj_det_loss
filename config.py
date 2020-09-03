@@ -9,11 +9,11 @@ class Config:
         self.cls_num = 20        
         self.res = 50
         self.size = 416
-        self.sizes = list(range(self.size-32*3,self.size-32*3+1,32)) + [self.size]
+        self.sizes =  [self.size] #+ list(range(self.size-32*3,self.size-32*3+1,32)) 
         self.sizes_w = [1]*len(self.sizes)
-        self.sizes_w[-1]+=3  
-        self.nms_threshold = 0.5
-        self.dc_threshold = 0.4
+        self.sizes_w[0]+=3  
+        self.nms_threshold = 0.3
+        self.dc_threshold = 0.1
         
         #loss args
         #self.anchors = [[0.26533935,0.33382434],[0.66550966,0.56042827],[0.0880948,0.11774004]] #w,h normalized by max size
@@ -29,6 +29,7 @@ class Config:
         if mode=='train':
             self.file='./pre_data/train.json'
             self.bs = 32 # batch size
+            self.flip = False
             #augmentation parameter
             self.rot = 0
             self.crop = 0.2
@@ -38,7 +39,7 @@ class Config:
             self.weight_decay=5e-4
             self.momentum = 0.9
             #lr_scheduler
-            self.min_lr = 1e-8
+            self.min_lr = 1e-7
             self.lr_factor = 0.25
             self.patience = 10
             #exp_setting

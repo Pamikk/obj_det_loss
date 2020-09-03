@@ -113,22 +113,23 @@ class VOC_dataset(data.Dataset):
         img = cv2.imread(os.path.join(self.img_path,name+'.jpg'))
         ##print(img.shape)
         img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
+        h,w = img.shape[:2]
         img,pad = self.pad_to_square(img)
-        h = img.shape[0]
+        size = img.shape[0]
         labels = self.gen_gts(anno)
         if self.mode=='train':
             labels[:,1]+=pad[1]
             labels[:,2]+=pad[0]
-            if random.randint(0,1)==1:
+            if (random.randint(0,1)==1) and self.cfg.flip:
                 img,labels = flip(img,labels)
             data = self.img_to_tensor(img)
-            labels = self.normalize_gts(labels,h)
+            labels = self.normalize_gts(labels,size)
             return data,labels      
         else:
             #validation set
             img = resize(img,(self.cfg.size,self.cfg.size))
             data = self.img_to_tensor(img)
-            info ={'size':h,'img_id':name,'pad':pad}
+            info ={'size':(h,w),'img_id':name,'pad':pad}
             if self.mode=='val':
                 return data,labels,info
             else:
