@@ -41,9 +41,9 @@ class Config:
             #lr_scheduler
             self.min_lr = 1e-7
             self.lr_factor = 0.25
-            self.patience = 10
+            self.patience = 12
             #exp_setting
-            self.save_every_k_epoch = 10
+            self.save_every_k_epoch = 15
             self.val_every_k_epoch = 10
             self.adjust_lr = False
 
