@@ -44,6 +44,7 @@ class Config:
         self.nms_threshold = 0.5
         self.dc_threshold = 0.4
         
+        
         #loss args
         #self.anchors = [[0.26533935,0.33382434],[0.66550966,0.56042827],[0.0880948,0.11774004]] #w,h normalized by max size
         #self.anchors = [[0.76822971,0.57259308],[0.39598597,0.47268035],[0.20632625,0.26720238],[0.07779112,0.10330848]]
@@ -54,13 +55,11 @@ class Config:
             self.anchors =  cal_anchors(self.sizes)
         self.anchor_divide=[(6,7,8),(3,4,5),(0,1,2)]
         self.anchor_num = len(self.anchors)
-        self.obj_scale = 1.5
-        self.noobj_scale = 0.5
-        self.ignore_threshold = 0.7
+        
         self.bs = 8       
         self.pre_trained_path = '../network_weights'
         if mode=='train':
-            self.file='./data/trainval.json'
+            self.file='./data/train.json'
             self.bs = 32 # batch size
             self.flip = False
             #augmentation parameter
@@ -79,6 +78,11 @@ class Config:
             self.save_every_k_epoch = 15
             self.val_every_k_epoch = 10
             self.adjust_lr = False
+            #loss hyp
+            self.obj_scale = 1
+            self.noobj_scale = 200
+            self.ignore_threshold = 0.7
+            self.match_threshold = 0.2#regard as match above this threshold
 
         elif mode=='val':
             self.file = './data/val.json'

@@ -167,6 +167,9 @@ class VOC_dataset(data.Dataset):
         if len(tmp)>0:
             labels = torch.cat(tmp,dim=0)
             labels = labels.reshape(-1,6)
+            area = labels[:,4]*labels[:,5]
+            idx = torch.argsort(area,descending=True)
+            labels = labels[idx,:].reshape(-1,6)
         else:
             labels = torch.tensor(tmp,dtype=torch.float).reshape(-1,6)
         if self.mode=='train':
