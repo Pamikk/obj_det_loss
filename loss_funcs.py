@@ -166,7 +166,7 @@ class YOLOLoss(nn.Module):
         w_noobj = (1-w_obj)
         loss_conf_obj = w_obj*self.object_scale*bce_loss(pds[obj_mask],tconf[obj_mask])
         loss_conf_noobj = w_noobj*self.noobject_scale*bce_loss(pds[noobj_mask],tconf[noobj_mask])
-        while loss_conf_noobj.item() > 2:
+        while w_noobj*self.noobject_scale > 5:
              self.noobject_scale*=0.1
              loss_conf_noobj*=0.1
         loss_conf = loss_conf_noobj+loss_conf_obj

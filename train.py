@@ -10,6 +10,7 @@ from models.network import NetAPI
 from trainer import Trainer
 import warnings
 from loss_funcs import LossAPI
+from config import cal_anchors
 
 warnings.filterwarnings('ignore')
 def main(args,cfgs):
@@ -31,6 +32,9 @@ def main(args,cfgs):
     config.device = torch.device("cuda")
     torch.cuda.empty_cache()
     #network
+    if args.anchors:
+        print('calculating new anchors')
+        config.anchors = cal_anchors(config.sizes)
     network = NetAPI(config,args.net)
     loss = LossAPI(config,args.loss)
     torch.cuda.empty_cache()
@@ -54,6 +58,7 @@ if __name__ == "__main__":
     parser.add_argument("--loss",type=str,default='yolo',help="loss type")
     parser.add_argument("--net",type=str,default='yolo',help="network type:yolo")
     parser.add_argument("--bs",type=int,default=16,help="batchsize")
+    parser.add_argument("--anchors",action='store_true')
     args = parser.parse_args()
     cfgs = {}
     cfgs['train'] = cfg()

@@ -17,19 +17,22 @@ def get_anno_files(rootdir):
                 files[name] = path
     return files
 def get_all_cont(root,dtype):
-    conts =[]
+    conts ={}
+    vals = []
     if root is None:
         return conts
     for cont in root:
-        conts.append(dtype(cont.text))
-    return conts
+        conts[cont.tag] = dtype(cont.text)
+        vals.append(dtype(cont.text))
+    return conts,vals
 def get_one_anno(path):
     tree = ET.parse(path)
     root = tree.getroot()
     anno={}
     anno['img_name'] = root.find('filename').text
     size = root.find('size')
-    anno['size'] = get_all_cont(size,int)
+    size,_ = get_all_cont(size,int)
+    anno['size'] = [size['width'],size['height'],size['depth']]
     objs = root.findall('object')
     anno['obj_num'] = len(objs)
     objects = []
@@ -38,8 +41,9 @@ def get_one_anno(path):
         name=obj.find('name').text
         label = voc_classes[name]-1#ignore background
         assert label>=0
-        bbox= obj.find('bndbox')
-        bbox = get_all_cont(bbox,float)
+        bbox = obj.find('bndbox')
+        bbox,vals = get_all_cont(bbox,float)
+        bbox = [bbox['xmin'],bbox['ymin'],bbox['xmax'],bbox['ymax']]
         hard = int(obj.find('difficult').text)
         item = [label]+bbox+[hard]
         objects.append(item)
@@ -51,40 +55,31 @@ def get_annotations(anno_dir):
     for idx in files:
         annos[idx] = get_one_anno(files[idx])
     return annos
-def split_annotation(anno,split_path):
-    test_list = open(os.path.join(split_path,'test.txt'),'r')
-    train_list = open(os.path.join(split_path,'train.txt'),'r')
-    val_list = open(os.path.join(split_path,'val.txt'),'r')
-    test = {}
+def split_annotation(anno,split_path,mode,dataset):
+    train_list = open(os.path.join(split_path,f'{mode}.txt'),'r')
     train = {}
-    val = {}
     trainval={}
-    for name in test_list.readlines():
-        name = name.strip()
-        test[name] = anno[name]
-    count = 0
+    count=0
     for name in train_list.readlines():
         name = name.strip()
         train[name] = anno[name]
-        if count<200:
+        if count<200 and mode=='train':
             trainval[name] = anno[name]
-        count+=1 
-    for name in val_list.readlines():
-        name = name.strip()
-        val[name] = anno[name]
-    print(len(test),len(train),len(val))
-    return test,train,val,trainval  
-
-anno_path = '../../dataset/VOCdevkit/VOC2007/Annotations'
+        count+=1
+    if  mode=='train':
+        json.dump(trainval,open(f'trainval_{dataset}.json','w'))
+    json.dump(train,open(f'{mode}_{dataset}.json','w'))
+    print(mode,len(train)) 
+dataset = 'VOC2007'
+anno_path = f'../../dataset/VOCdevkit/{dataset}/Annotations'
 annos = get_annotations(anno_path)
-json.dump(annos,open('annotation_voc07.json','w'))
-#annos = json.load(open('annotation_voc07.json','r'))
+json.dump(annos,open(f'annotation_{dataset}.json','w'))
+#annos = json.load(open(f'annotation_{dataset}.json','r'))
 
-split_path = '../../dataset/VOCdevkit/VOC2007/ImageSets/Main'
-test,train,val,trainval = split_annotation(annos,split_path)
-json.dump(test,open('test.json','w'))
-json.dump(train,open('train.json','w'))
-json.dump(val,open('val.json','w'))
-json.dump(trainval,open('trainval.json','w'))
+split_path = f'../../dataset/VOCdevkit/{dataset}/ImageSets/Main'
+modes=['train','val']
+for mode in modes:
+    split_annotation(annos,split_path,mode,dataset)
+
 
 

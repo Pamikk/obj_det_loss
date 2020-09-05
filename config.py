@@ -4,8 +4,10 @@ import random
 import json
 
 from stats import kmeans
-anchors = [[26.646, 39.172], [57.83, 57.849], [71.924, 112.002], [107.664, 122.6], [157.196, 164.851], [190.146, 212.889], [296.238, 270.184], [330.639, 294.094], [438.711, 358.986]]
-path ='data/annotation_voc07.json' #annotation path for anchor calculation
+anchors =[[25.037, 31.196], [50.498, 79.588], [78.5, 86.013], [124.951, 126.297], [147.095, 168.983], [191.18, 202.286], [267.642, 220.965], [324.666, 305.925], [363.639, 347.229]]# [[26.646, 39.172], [57.83, 57.849], [71.924, 112.002], [107.664, 122.6], [157.196, 164.851], [190.146, 212.889], [296.238, 270.184], [330.639, 294.094], [438.711, 358.986]]#VOC07
+#anchors = 
+dataset = 'VOC2012'
+path =f'data/annotation_{dataset}.json' #annotation path for anchor calculation
 def cal_anchors(sizes=None,num=9):
     #As in https://github.com/eriklindernoren/PyTorch-YOLOv3
     # randomly scale as sizes if sizes is not None    
@@ -18,23 +20,27 @@ def cal_anchors(sizes=None,num=9):
         for bbox in anno['labels']:
             xmin,ymin,xmax,ymax = bbox[1:5]
             bw,bh = xmax-xmin,ymax-ymin
+            if bw<0 or bh<0:
+                print(name,bbox)
+                exit()
             t = max(w,h)
             if sizes == None:
                 scale = t
             else:
                 scale = random.choice(sizes)
             allb.append((bw/t*scale,bh/t*scale))
-    km = kmeans(allb,k=num,max_iters=500)
+    km = kmeans(allb,k=num,max_iters=1000)
     km.initialization()
     km.iter(0)
-    km.print_cs()  
-    return km.get_centers()
+    km.print_cs()
+    anchors = km.get_centers()  
+    print(anchors)
+    return anchors
 #Train Setting
 class Config:
     def __init__(self,mode='train'):
         #Path Setting
-        self.test_img_path='../dataset/VOCdevkit/VOC2007/JPEGImages'
-        self.img_path = '../dataset/VOCdevkit/VOC2007/JPEGImages'
+        self.img_path = f'../dataset/VOCdevkit/{dataset}/JPEGImages'
         self.checkpoint='../checkpoints'
         self.cls_num = 20        
         self.res = 50
@@ -48,18 +54,14 @@ class Config:
         #loss args
         #self.anchors = [[0.26533935,0.33382434],[0.66550966,0.56042827],[0.0880948,0.11774004]] #w,h normalized by max size
         #self.anchors = [[0.76822971,0.57259308],[0.39598597,0.47268035],[0.20632625,0.26720238],[0.07779112,0.10330848]]
-        self.keep_anchors = True
-        if self.keep_anchors:
-            self.anchors= anchors  
-        else:
-            self.anchors =  cal_anchors(self.sizes)
+        self.anchors= anchors  
         self.anchor_divide=[(6,7,8),(3,4,5),(0,1,2)]
         self.anchor_num = len(self.anchors)
         
         self.bs = 8       
         self.pre_trained_path = '../network_weights'
         if mode=='train':
-            self.file='./data/train.json'
+            self.file=f'./data/train_{dataset}.json'
             self.bs = 32 # batch size
             self.flip = False
             #augmentation parameter
@@ -82,12 +84,12 @@ class Config:
             self.obj_scale = 1
             self.noobj_scale = 200
             self.ignore_threshold = 0.7
-            self.match_threshold = 0.2#regard as match above this threshold
+            self.match_threshold = 0#regard as match above this threshold
 
         elif mode=='val':
-            self.file = './data/val.json'
+            self.file = f'./data/val_{dataset}.json'
         elif mode=='trainval':
-            self.file = './data/trainval.json'
+            self.file = f'./data/trainval_{dataset}.json'
         elif mode=='test':
-            self.file = './data/trainval.json'
+            self.file = f'./data/trainval_{dataset}.json'
         

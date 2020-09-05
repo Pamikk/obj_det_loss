@@ -10,11 +10,11 @@ def init_weights(m):
     elif type(m) == nn.BatchNorm2d:
         torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
         torch.nn.init.constant_(m.bias.data, 0.0)
-def NetAPI(cfg,net,init=False):
+def NetAPI(cfg,net,init=True):
     networks = {'yolo':YOLO,'yolo_spp':YOLO_SPP}
     network = networks[net](cfg)
     if init:
-        network.apply(init_weights)
+        network.initialization()
     return network
 
 class NonResidual(nn.Module):
@@ -50,6 +50,10 @@ class YOLO(nn.Module):
             decoder = self.make_prediction(len(ind)*(cfg.cls_num+5),NonResidual,channels[i],upsample=i!=0)
             decoders.append(decoder)
         self.decoders = nn.ModuleList(decoders)
+    def initialization(self):
+        for m in self.modules():
+            init_weights(m)
+        self.encoders.load_dark_net()
     def make_prediction(self,out_channel,block,channel,upsample=True):
         if upsample:
             upsample = nn.Sequential(conv1x1(self.in_channel,channel),nn.BatchNorm2d(channel),
