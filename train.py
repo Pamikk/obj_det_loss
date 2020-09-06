@@ -34,7 +34,7 @@ def main(args,cfgs):
     #network
     if args.anchors:
         print('calculating new anchors')
-        config.anchors = cal_anchors(config.sizes)
+        config.anchors,_ = cal_anchors(config.sizes)
     network = NetAPI(config,args.net)
     loss = LossAPI(config,args.loss)
     torch.cuda.empty_cache()

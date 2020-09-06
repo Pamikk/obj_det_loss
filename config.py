@@ -33,9 +33,9 @@ def cal_anchors(sizes=None,num=9):
     km.initialization()
     km.iter(0)
     km.print_cs()
-    anchors = km.get_centers()  
-    print(anchors)
-    return anchors
+    anchors = km.get_centers()
+    km.cal_all_dist()  
+    return anchors,km
 #Train Setting
 class Config:
     def __init__(self,mode='train'):
@@ -63,7 +63,7 @@ class Config:
         if mode=='train':
             self.file=f'./data/train_{dataset}.json'
             self.bs = 32 # batch size
-            self.flip = False
+            self.flip = True
             #augmentation parameter
             self.rot = 0
             self.crop = 0.2
@@ -81,10 +81,10 @@ class Config:
             self.val_every_k_epoch = 10
             self.adjust_lr = False
             #loss hyp
-            self.obj_scale = 1
-            self.noobj_scale = 200
+            self.obj_scale = 0.5
+            self.noobj_scale = 1
             self.ignore_threshold = 0.7
-            self.match_threshold = 0#regard as match above this threshold
+            self.match_threshold = 0.2#regard as match above this threshold
 
         elif mode=='val':
             self.file = f'./data/val_{dataset}.json'

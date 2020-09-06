@@ -70,7 +70,7 @@ def split_annotation(anno,split_path,mode,dataset):
         json.dump(trainval,open(f'trainval_{dataset}.json','w'))
     json.dump(train,open(f'{mode}_{dataset}.json','w'))
     print(mode,len(train)) 
-dataset = 'VOC2007'
+dataset = 'VOC2012'
 anno_path = f'../../dataset/VOCdevkit/{dataset}/Annotations'
 annos = get_annotations(anno_path)
 json.dump(annos,open(f'annotation_{dataset}.json','w'))
