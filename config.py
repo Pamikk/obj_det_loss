@@ -4,7 +4,7 @@ import random
 import json
 
 from stats import kmeans
-anchors =[[25.037, 31.196], [50.498, 79.588], [78.5, 86.013], [124.951, 126.297], [147.095, 168.983], [191.18, 202.286], [267.642, 220.965], [324.666, 305.925], [363.639, 347.229]]# [[26.646, 39.172], [57.83, 57.849], [71.924, 112.002], [107.664, 122.6], [157.196, 164.851], [190.146, 212.889], [296.238, 270.184], [330.639, 294.094], [438.711, 358.986]]#VOC07
+anchors = [23.185, 32.097], [55.713, 67.159], [66.77, 100.214], [113.587, 143.621], [142.077, 145.61], [185.537, 218.519], [262.155, 246.354], [294.432, 259.957], [367.802, 326.062]]
 #anchors = 
 dataset = 'VOC2012'
 path =f'data/annotation_{dataset}.json' #annotation path for anchor calculation
@@ -27,7 +27,7 @@ def cal_anchors(sizes=None,num=9):
             if sizes == None:
                 scale = t
             else:
-                scale = random.choice(sizes)
+                scale = sizes
             allb.append((bw/t*scale,bh/t*scale))
     km = kmeans(allb,k=num,max_iters=1000)
     km.initialization()
@@ -84,7 +84,7 @@ class Config:
             self.obj_scale = 0.5
             self.noobj_scale = 1
             self.ignore_threshold = 0.7
-            self.match_threshold = 0.2#regard as match above this threshold
+            self.match_threshold = 0.014#regard as match above this threshold
 
         elif mode=='val':
             self.file = f'./data/val_{dataset}.json'

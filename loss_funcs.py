@@ -111,8 +111,8 @@ class YOLOLoss(nn.Module):
         grid_x,grid_y = make_grid_mesh_xy(self.grid_size,self.device)
         xs = torch.sigmoid(pred[...,0])#dxs
         ys = torch.sigmoid(pred[...,1])#dys
-        ws = torch.pow(pred[...,2],2)
-        hs = torch.pow(pred[...,3],2)
+        ws = pred[...,2]
+        hs = pred[...,3]
         conf = torch.sigmoid(pred[...,4])#Object score
         cls_score = torch.sigmoid(pred[...,5:])
         #grid,anchors
@@ -121,8 +121,8 @@ class YOLOLoss(nn.Module):
         pd_bboxes = torch.zeros_like(pred[...,:4],dtype=torch.float,device=self.device)
         pd_bboxes[...,0] = xs + grid_x
         pd_bboxes[...,1] = ys + grid_y
-        pd_bboxes[...,2] = ws*self.anchors_w
-        pd_bboxes[...,3] = hs*self.anchors_h
+        pd_bboxes[...,2] = torch.exp(ws)*self.anchors_w
+        pd_bboxes[...,3] = torch.exp(hs)*self.anchors_h
         nb = pred.shape[0]        
         if infer:
             pd_bboxes[...,[0,2]]/=self.grid_size[1]
@@ -143,8 +143,8 @@ class YOLOLoss(nn.Module):
         loss_y = mse_loss(ys[obj_mask],tys[obj_mask]-tys[obj_mask].floor())
         loss_xy = loss_x + loss_y
 
-        loss_w = mse_loss(ws[obj_mask],tws[obj_mask])
-        loss_h = mse_loss(hs[obj_mask],ths[obj_mask])
+        loss_w = mse_loss(ws[obj_mask],torch.log(tws[obj_mask]+1e-16))
+        loss_h = mse_loss(hs[obj_mask],torch.log(ths[obj_mask]+1e-16))
         loss_wh = loss_w + loss_h
         res['wh']=loss_wh.item()
         res['xy']=loss_xy.item()
@@ -223,11 +223,11 @@ class YOLOLoss_com(YOLOLoss):
     def cal_bbox_loss(self,pds,tbboxes,obj_mask,res):
         xs,ys,ws,hs,pd_bboxes = pds
         txs,tys,tws,ths = tbboxes.permute(4,0,1,2,3).contiguous()
+        tws /= self.anchors_w
+        ths /= self.anchors_h
         loss_x = mse_loss(xs[obj_mask],txs[obj_mask]-txs[obj_mask].floor())
         loss_y = mse_loss(ys[obj_mask],tys[obj_mask]-tys[obj_mask].floor())
         loss_xy = loss_x + loss_y
-        loss_w = mse_loss(ws[obj_mask],torch.log(tws[obj_mask]/self.anchors_w))
-        loss_h = mse_loss(hs[obj_mask],torch.log(ths[obj_mask]/self.anchors_h))
         loss_wh = loss_w + loss_h
         res['wh']=loss_wh.item()
         res['xy']=loss_xy.item()
@@ -244,10 +244,7 @@ class YOLOLoss_com(YOLOLoss):
         res['iou'] = loss_iou.item()
         res['gou'] = loss_gou.item()
         return loss_gou+loss_bbox,res
-class nAYOLOLoss(myYOLOLoss):
-    #build loss w/o anchors
-    def build_target(self,pds,gts):
-        pass
+
 class LossAPI(nn.Module):
     def __init__(self,cfg,loss):
         super(LossAPI,self).__init__()
@@ -279,7 +276,7 @@ class LossAPI(nn.Module):
             return res,torch.stack(totals).sum()
     def reset_notmatch(self):
         self.not_match = 0
-Losses = {'yolo':YOLOLoss,'yolo_iou':YOLOLoss_iou,'yolo_gou':YOLOLoss_gou,'yolo_com':YOLOLoss_com,'my_yolo':myYOLOLoss}
+Losses = {'yolo':YOLOLoss,'yolo_iou':YOLOLoss_iou,'yolo_gou':YOLOLoss_gou,'yolo_com':YOLOLoss_com}
 
 
 
