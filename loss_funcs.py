@@ -71,31 +71,33 @@ class YOLOLoss(nn.Module):
         if nGts==0:
             return obj_mask,noobj_mask,tbboxes,tcls,obj_mask.float()
         #convert target
-        idx = torch.argsort(gts[:,-1],descending=True)#sort as match num,then gt has not matched will be matched first
-        gt_boxes = gts[idx,2:6]*nH
+        gt_boxes = gts[:,2:6]*nH
         gws = gt_boxes[:,2]
         ghs = gt_boxes[:,3]
 
         ious = torch.stack([iou_wo_center(gws,ghs,w,h) for (w,h) in self.scaled_anchors])
         vals, best_n = ious.max(0)
-        match_mask = (vals>self.match_threshold)|(gts[:,-1]==0)
+        ind = torch.argsort(vals)
+        # so that obj with bigger iou will cover the smaller one 
+        # useful for crowed scenes
+        idx = torch.argsort(gts[ind,-1],descending=True)#sort as match num,then gt has not matched will be matched first
+        ind = ind[idx]
+        ind = ind[(vals[ind]>self.match_threshold)|(gts[ind,-1]==0)]
+        #discard the gts below the match threshold and has been matched
 
-        best_n = best_n[match_mask]
-        idx = idx[match_mask]
-        batch = gts[idx,0].long()
-        gt_labels = gts[idx,1].long()
-        gxs,gys = gt_boxes[match_mask,0],gt_boxes[match_mask,1]
+
+        best_n =best_n[ind]
+        batch = gts[ind,0].long()
+        gxs,gys = gt_boxes[ind,0],gt_boxes[ind,1]
         gis,gjs = gxs.long(),gys.long()
         #calculate bbox ious with anchors      
-        
         obj_mask[batch,best_n,gjs,gis] = 1
         noobj_mask[batch,best_n,gjs,gis] = 0
         selected = torch.zeros_like(obj_mask,dtype=torch.long).fill_(-1)
         
-        tbboxes[batch,best_n,gjs,gis] = gt_boxes[match_mask]
-        selected[batch,best_n,gjs,gis] = idx
-        tcls[batch,best_n,gjs,gis,gt_labels] = 1
-        ious = ious.t()[match_mask,:]
+        tbboxes[batch,best_n,gjs,gis] = gt_boxes[ind,:]
+        selected[batch,best_n,gjs,gis] = ind
+        ious = ious.t()[ind]
         #ignore big overlap but not the best
         for i,iou in enumerate(ious):
             noobj_mask[batch[i],iou > self.ignore_threshold,gjs[i],gis[i]] = 0
