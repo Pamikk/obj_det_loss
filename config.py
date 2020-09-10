@@ -4,8 +4,6 @@ import random
 import json
 
 from stats import kmeans
-anchors = [23.185, 32.097], [55.713, 67.159], [66.77, 100.214], [113.587, 143.621], [142.077, 145.61], [185.537, 218.519], [262.155, 246.354], [294.432, 259.957], [367.802, 326.062]]
-#anchors = 
 dataset = 'VOC2012'
 path =f'data/annotation_{dataset}.json' #annotation path for anchor calculation
 def cal_anchors(sizes=None,num=9):
@@ -63,10 +61,13 @@ class Config:
         if mode=='train':
             self.file=f'./data/train_{dataset}.json'
             self.bs = 32 # batch size
-            self.flip = True
+            
             #augmentation parameter
+            self.flip = True
             self.rot = 0
-            self.crop = 0.2
+            self.crop = True
+            self.trans = True
+            self.scale = 0.1
             self.valid_scale = 0.25
             #train_setting
             self.lr = 0.01
