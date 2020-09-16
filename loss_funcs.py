@@ -188,7 +188,7 @@ class YOLOLoss(nn.Module):
         pds_bbox,pds_obj,pds_cls = pds
         loss_obj,res = self.cal_obj_loss(pds_obj,tobj,obj_mask,{})                     
         if obj_mask.float().max()==1:
-            loss_reg,res = self.cal_bbox_loss(pds_bbox,tbboxes,obj_mask,{})
+            loss_reg,res = self.cal_bbox_loss(pds_bbox,tbboxes,obj_mask,res)
             loss_cls,res = self.cal_cls_loss(pds_cls,tcls,obj_mask,res)
             total = loss_reg+loss_obj+loss_cls
         else:

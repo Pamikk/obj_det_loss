@@ -148,6 +148,8 @@ class Trainer:
             del inputs,outs,labels
             for k in running_loss:
                 if k in display.keys():
+                    if np.isnan(display[k]):
+                        continue
                     running_loss[k] += display[k]/n
             loss.backward()
             #solve gradient explosion problem caused by large learning rate or small batch size

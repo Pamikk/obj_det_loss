@@ -83,10 +83,10 @@ class Config:
             self.val_every_k_epoch = 10
             self.adjust_lr = False
             #loss hyp
-            self.obj_scale = 0.5
-            self.noobj_scale = 1
+            self.obj_scale = 2
+            self.noobj_scale = 10
             self.ignore_threshold = 0.7
-            self.match_threshold = 0.014#regard as match above this threshold
+            self.match_threshold = 0.01#regard as match above this threshold
 
         elif mode=='val':
             self.file = f'./data/val_{dataset}.json'
