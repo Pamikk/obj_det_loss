@@ -37,12 +37,13 @@ def rand(item):
             return 0
     finally:
         return tuple(tmp)   
-def get_croppable_part(labels):
+def get_croppable_part(labels,size):
+    h,w = size
     min_x = torch.min(labels[:,ls]-labels[:,ls+2]/2)
     min_y = torch.min(labels[:,ls+1]-labels[:,ls+3]/2)
     max_x = torch.max(labels[:,ls]+labels[:,ls+2]/2)
     max_y = torch.max(labels[:,ls+1]+labels[:,ls+3]/2)
-    return (min_x,min_y,max_x,max_y)
+    return (max(min_x,0),max(0,min_y),min(w-1,max_x),min(h-1,max_y))
 def valid_scale(src,vs):
     img = cv2.cvtColor(src,cv2.COLOR_RGB2HSV).astype(np.float)
     img[:,:,2] *= (1+vs)
@@ -52,39 +53,41 @@ def valid_scale(src,vs):
 def resize(src,tsize):
     dst = cv2.resize(src,(tsize[1],tsize[0]),interpolation=cv2.INTER_LINEAR)
     return dst
-def translate(src,labels):
+def translate(src,labels,trans):
     h,w,_ = src.shape
     if labels.shape[0]>0:
-        mx,my,mxx,mxy = get_croppable_part(labels)
-        tx = random.uniform(-mx,w-mxx-1)
-        ty = random.uniform(-my,h-mxy-1)
+        mx,my,mxx,mxy = get_croppable_part(labels,(h,w))
+        tx = random.uniform(-min(mx,w*trans),min(w*trans,w-mxx-1))
+        ty = random.uniform(-min(my,h*trans),min(h*trans,h-mxy-1))
     else:
-        tx = random.uniform(-w*0.2,w*0.2)
-        ty = random.uniform(-h*0.2,h*0.2)
-    
+        tx = random.uniform(-w*trans,w*trans)
+        ty = random.uniform(-h*trans,h*trans)
     mat = np.array([[1,0,tx],[0,1,ty]])
     dst = cv2.warpAffine(src,mat,(w,h))
-
     labels[:,ls] += tx
     labels[:,ls+1] += ty
+    
     return dst,labels
-def crop(src,labels):
+def crop(src,labels,crop):
     h,w,_ = src.shape
+    if ((w<10)or(h<10)):
+        return src,labels
     if labels.shape[0]>0:
-        mx,my,mxx,mxy = get_croppable_part(labels)
-        txm = int(random.uniform(0,mx))
-        tym = int(random.uniform(0,my))
-        txmx = int(random.uniform(mxx,w+0.9))
-        tymx = int(random.uniform(mxy,h+0.9))
+        mx,my,mxx,mxy = get_croppable_part(labels,(h,w))
+        txm = int(random.uniform(0,min(mx,w*crop)))
+        tym = int(random.uniform(0,min(my,h*crop)))
+        txmx = int(random.uniform(max(mxx,w*(1-crop)),w))
+        tymx = int(random.uniform(max(mxy,h*(1-crop)),h))
+        labels[:,ls] -= txm
+        labels[:,ls+1] -= tym
     else:
-        txm = int(random.uniform(0,w*0.2))
-        tym = int(random.uniform(0,h*0.2))
-        txmx = int(random.uniform(w*0.8,w+0.9))
-        tymx = int(random.uniform(h*0.8,h+0.9))
+        txm = int(random.uniform(0,w*crop))
+        tym = int(random.uniform(0,h*crop))
+        txmx = int(random.uniform(w*(1-crop),w-0.1))
+        tymx = int(random.uniform(h*(1-crop),h-0.1))
     dst = src.copy()
-    dst = dst[tym:tymx,txm:txmx,:]
-    labels[:,ls] -= txm
-    labels[:,ls+1] -= tym
+    dst = dst[tym:tymx+1,txm:txmx+1,:]
+    
     return dst,labels
 def rotate(src,labels,ang,scale):
     h,w,_ = src.shape
@@ -92,18 +95,19 @@ def rotate(src,labels,ang,scale):
     mat = cv2.getRotationMatrix2D(center, ang, scale)
     dst = cv2.warpAffine(src,mat,(w,h))
     labels_ = labels.clone()
-    xs,ys,ws,hs = labels[:,ls:].t()
-    n = len(xs)
-    sx = abs(mat[0,0])
-    sy = abs(mat[0,1])
-    pts = np.stack([xs,ys,np.ones([n])],axis=1).T
-    tpts = torch.tensor(np.dot(mat,pts).T,dtype=torch.float)
-    labels_[:,ls] = tpts[:,0]
-    labels_[:,ls+1] = tpts[:,1]
-    labels_[:,ls+2] = (sx*ws + sy*hs)*scale
-    labels_[:,ls+3] = (sx*hs + sy*ws)*scale
-    mask = (tpts[:,0]>0)&(tpts[:,0]<w)&(tpts[:,1]>0)&(tpts[:,1]<h)
-    labels_ = labels_[mask,:]
+    if labels.shape[0]>0:
+        xs,ys,ws,hs = labels[:,ls:].t()
+        n = len(xs)
+        sx = abs(mat[0,0])
+        sy = abs(mat[0,1])
+        pts = np.stack([xs,ys,np.ones([n])],axis=1).T
+        tpts = torch.tensor(np.dot(mat,pts).T,dtype=torch.float)
+        labels_[:,ls] = tpts[:,0]
+        labels_[:,ls+1] = tpts[:,1]
+        labels_[:,ls+2] = (sx*ws + sy*hs)*scale
+        labels_[:,ls+3] = (sx*hs + sy*ws)*scale
+        mask = (tpts[:,0]>0)&(tpts[:,0]<w)&(tpts[:,1]>0)&(tpts[:,1]<h)
+        labels_ = labels_[mask,:]
     return dst,labels_
 def flip(src,labels):
     w = src.shape[1]
@@ -176,9 +180,9 @@ class VOC_dataset(data.Dataset):
             if (random.randint(0,1)==1) and self.cfg.flip:
                 img,labels = flip(img,labels)
             if (random.randint(0,1)==1) and self.cfg.trans:
-                img,labels = translate(img,labels)
+                img,labels = translate(img,labels,self.cfg.trans)
             if (random.randint(0,1)==1) and self.cfg.crop:
-                img,labels = crop(img,labels)
+                img,labels = crop(img,labels,self.cfg.crop)
             if (random.randint(0,1)==1) and self.cfg.rot:
                 ang = random.uniform(-self.cfg.rot,self.cfg.rot)
                 scale = random.uniform(1-self.cfg.scale,1+self.cfg.scale)
