@@ -8,9 +8,9 @@ from tqdm import tqdm
 import os
 import json
 
-from utils import Logger
+from utils import Logger,ap_per_class
 from utils import non_maximum_supression as nms
-from utils import cal_tp_per_item,ap_per_class
+from utils import cal_tp_per_item as cal_tp
 tosave = ['mAP']
 plot = [0.5,0.75] 
 thresholds = np.around(np.arange(0.5,0.96,0.05),2)
@@ -66,12 +66,13 @@ class Trainer:
         self.save_pred = False
         self.adjust_lr = cfg.adjust_lr
         #load from epoch if required
-        if start>0:
-            self.load_epoch(str(start))
-        if start==-1:
-            self.load_last_epoch()
-        if start==-2:
-            self.load_epoch('best')#best moving
+        if start:
+            if start=='-1':
+                self.load_last_epoch()
+            else:
+                self.load_epoch(start)
+        else:
+            self.start = 0
         self.net = self.net.to(self.device)
     def load_last_epoch(self):
         files = os.listdir(self.checkpoints)
@@ -219,6 +220,7 @@ class Trainer:
             for th in thresholds:
                 batch_metrics[th] = []
             gt_labels = []
+            pd_num = 0
             for _,data in tqdm(enumerate(valset)):
                 inputs,labels,info = data
                 outs = self.net(inputs.to(self.device).float())
@@ -245,13 +247,14 @@ class Trainer:
                     pred_nms[:,:4]*=max(size)
                     pred_nms[:,0] -= pad[1]
                     pred_nms[:,1] -= pad[0]
+                    pd_num+=pred_nms.shape[0]
                     ##if pred_nms.shape[0]>0:
                       ## print(pred_nms[0])
                     count+=1
                     for th in batch_metrics:
-                        batch_metrics[th].append(cal_tp_per_item(pred_nms,gt,th))
+                        batch_metrics[th].append(cal_tp(pred_nms,gt,th))
         metrics = {}
-        for th in batch_metrics:
+        for th in batch_metrics:W
             tps,scores,pd_labels = [np.concatenate(x, 0) for x in list(zip(*batch_metrics[th]))]
             precision, recall, AP,_,_ = ap_per_class(tps, scores, pd_labels, gt_labels)
             mAP += np.mean(AP)

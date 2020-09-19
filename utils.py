@@ -322,9 +322,39 @@ def cal_tp_per_item(pds,gts,threshold=0.5):
                 selected[best] = 1
                 tps[pd_idx[i]] = 1.0
                 mc -=1
-                sel_ious[best] = iou           
+                sel_ious[best] = iou          
     return [tps,scores,pds[:,-1]]
-    
+def cal_tp_per_item_wo_cls(pds,gts,threshold=0.5):
+    assert (len(pds.shape)>1) and (len(gts.shape)>1)
+    pds = pds.cpu().numpy()
+    gts = gts.cpu().numpy()
+    ##print(gts.shape,pds.shape)
+    n = pds.shape[0]
+    tps = np.zeros(n)
+    scores = pds[:,4]*pds[:,5]
+    pd_idx = np.where(pds[:-1]<21)[0]
+    pdbboxes = pds[pd_idx,:4].reshape(-1,4)
+    gtbboxes = gts[:,1:].reshape(-1,4)
+    nc = pdbboxes.shape[0]
+    mc = gtbboxes.shape[0]
+    selected = np.zeros(mc)
+    sel_ious = np.zeros(mc)
+    for i in range(nc):
+        if mc == 0:
+            break
+        pdbbox = pdbboxes[i]
+        ious = iou_wt_center_np(pdbbox,gtbboxes)
+        iou = ious.max()
+        best = ious.argmax()
+        ##print(iou)
+        if iou >=threshold  and selected[best] !=1:
+            selected[best] = 1
+            tps[pd_idx[i]] = 1.0
+            mc -=1
+            sel_ious[best] = iou
+    if tps.sum()>gts.shape[0]:
+        exit()         
+    return [tps,scores,pds[:,-1]]
 def xyhw2xy(boxes_):
     boxes = boxes_.clone()
     boxes[:,0] = boxes_[:,0] - boxes_[:,2]/2

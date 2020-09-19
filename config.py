@@ -47,7 +47,7 @@ class Config:
         self.multiscale = 3
         self.sizes = list(range(self.size-32*self.multiscale,self.size+32*self.multiscale+1,32)) 
         self.nms_threshold = 0.5
-        self.dc_threshold = 0.75
+        self.dc_threshold = 0.95
         
         
         #loss args
@@ -85,6 +85,7 @@ class Config:
             #loss hyp
             self.obj_scale = 2
             self.noobj_scale = 10
+            self.cls_scale = 10
             self.ignore_threshold = 0.7
             self.match_threshold = 0.01#regard as match above this threshold
 
