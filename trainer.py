@@ -254,7 +254,7 @@ class Trainer:
                     for th in batch_metrics:
                         batch_metrics[th].append(cal_tp(pred_nms,gt,th))
         metrics = {}
-        for th in batch_metrics:W
+        for th in batch_metrics:
             tps,scores,pd_labels = [np.concatenate(x, 0) for x in list(zip(*batch_metrics[th]))]
             precision, recall, AP,_,_ = ap_per_class(tps, scores, pd_labels, gt_labels)
             mAP += np.mean(AP)
