@@ -89,6 +89,7 @@ class YOLOLoss(nn.Module):
 
         best_n =best_n[ind]
         batch = gts[ind,0].long()
+        labels = gts[ind,1].long()
         gxs,gys = gt_boxes[ind,0],gt_boxes[ind,1]
         gis,gjs = gxs.long(),gys.long()
         #calculate bbox ious with anchors      
@@ -97,6 +98,7 @@ class YOLOLoss(nn.Module):
         selected = torch.zeros_like(obj_mask,dtype=torch.long).fill_(-1)
         
         tbboxes[batch,best_n,gjs,gis] = gt_boxes[ind,:]
+        tcls[batch,best_n,gjs,gis,labels] = 1
         selected[batch,best_n,gjs,gis] = ind
         ious = ious.t()[ind]
         #ignore big overlap but not the best
