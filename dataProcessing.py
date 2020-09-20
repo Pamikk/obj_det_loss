@@ -156,7 +156,7 @@ class VOC_dataset(data.Dataset):
         #transfer
         if len(labels)== 0:
             return labels
-        labels/=size 
+        labels[:,ls:]/=size 
         return labels
 
     def pad_to_square(self,img):

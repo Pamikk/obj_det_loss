@@ -322,7 +322,7 @@ def cal_tp_per_item(pds,gts,threshold=0.5):
                 selected[best] = 1
                 tps[pd_idx[i]] = 1.0
                 mc -=1
-                sel_ious[best] = iou          
+                sel_ious[best] = iou         
     return [tps,scores,pds[:,-1]]
 def cal_tp_per_item_wo_cls(pds,gts,threshold=0.5):
     assert (len(pds.shape)>1) and (len(gts.shape)>1)
