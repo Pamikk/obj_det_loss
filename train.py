@@ -19,6 +19,7 @@ def main(args,cfgs):
     val_cfg = cfgs['val']
     trainval_cfg = cfgs['trainval']
     test_cfg = cfgs['test']
+    config.pretrain = args.pretrain
     train_set = dataset(config)
     val_set = dataset(val_cfg,mode='val')
     trainval_set = dataset(trainval_cfg,mode='val')
@@ -32,6 +33,7 @@ def main(args,cfgs):
     config.device = torch.device("cuda")
     torch.cuda.empty_cache()
     #network
+    
     if args.anchors:
         print('calculating new anchors')
         config.anchors,_ = cal_anchors(config.size)
@@ -59,6 +61,7 @@ if __name__ == "__main__":
     parser.add_argument("--net",type=str,default='yolo',help="network type:yolo")
     parser.add_argument("--bs",type=int,default=16,help="batchsize")
     parser.add_argument("--anchors",action='store_true')
+    parser.add_argument("--pretrain",action='store_true')
     args = parser.parse_args()
     cfgs = {}
     cfgs['train'] = cfg()

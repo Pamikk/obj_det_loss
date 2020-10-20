@@ -5,7 +5,7 @@ import json
 
 from stats import kmeans
 anchors = [[23.887, 32.021], [54.734, 71.147], [71.077, 96.459], [121.573, 129.046], [138.858, 153.688], [206.027, 187.171], [219.306, 230.669], [330.67, 272.986], [352.267, 315.159]]
-dataset = 'VOC2012'
+dataset = 'VOC2007'
 path =f'data/annotation_{dataset}.json' #annotation path for anchor calculation
 def cal_anchors(sizes=None,num=9):
     #As in https://github.com/eriklindernoren/PyTorch-YOLOv3
@@ -48,17 +48,14 @@ class Config:
         self.sizes = list(range(self.size-32*self.multiscale,self.size+32*self.multiscale+1,32)) 
         self.nms_threshold = 0.5
         self.dc_threshold = 0.95
-        
-        
-        #loss args
-        #self.anchors = [[0.26533935,0.33382434],[0.66550966,0.56042827],[0.0880948,0.11774004]] #w,h normalized by max size
-        #self.anchors = [[0.76822971,0.57259308],[0.39598597,0.47268035],[0.20632625,0.26720238],[0.07779112,0.10330848]]
+
         self.anchors= anchors  
         self.anchor_divide=[(5,6,7,8),(3,4),(0,1,2)]
         self.anchor_num = len(self.anchors)
         
         self.bs = 8       
         self.pre_trained_path = '../network_weights'
+        self.pretrain = False
         if mode=='train':
             self.file=f'./data/train_{dataset}.json'
             self.bs = 32 # batch size

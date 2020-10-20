@@ -10,7 +10,7 @@ import json
 
 from utils import Logger,ap_per_class
 from utils import non_maximum_supression as nms
-from utils import cal_tp_per_item as cal_tp
+from utils import cal_tp_per_item_wo_cls as cal_tp
 tosave = ['mAP']
 plot = [0.5,0.75] 
 thresholds = np.around(np.arange(0.5,0.96,0.05),2)
@@ -33,7 +33,18 @@ class Trainer:
         self.checkpoints = os.path.join(cfg.checkpoint,name)
         self.device = cfg.device
         self.net = self.net
-        self.optimizer = optim.SGD(self.net.parameters(),lr=cfg.lr,weight_decay=cfg.weight_decay,momentum =cfg.momentum)
+        
+        self.save_every_k_epoch = cfg.save_every_k_epoch #-1 for not save and validate
+        self.val_every_k_epoch = cfg.val_every_k_epoch
+        if cfg.pretrain:
+            self.val_every_k_epoch=-1
+            self.save_every_k_epoch=-1
+            opt_state_dict = [{'params': list(net.encoders.parameters())+ list(net.pred.parameters())},
+                              {'params': net.decoders.parameters(), 'lr': 0.0}]#freeze location part
+        else:
+            opt_state_dict = [{'params': list(net.encoders.parameters())+ list(net.pred.parameters()),'lr':cfg.lr*0.1},
+                              {'params': net.decoders.parameters()}]
+        self.optimizer = optim.SGD(opt_state_dict,lr=cfg.lr,weight_decay=cfg.weight_decay,momentum =cfg.momentum)
         self.lr_sheudler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,mode='min', factor=cfg.lr_factor, threshold=0.0001,patience=cfg.patience,min_lr=cfg.min_lr)
         if not(os.path.exists(self.checkpoints)):
             os.mkdir(self.checkpoints)
@@ -47,11 +58,9 @@ class Trainer:
         log_dir = os.path.join(self.checkpoints,'logs')
         if not(os.path.exists(log_dir)):
             os.mkdir(log_dir)
+            self.load_pre_train()
         self.logger = Logger(log_dir)
         torch.cuda.empty_cache()
-        self.save_every_k_epoch = cfg.save_every_k_epoch #-1 for not save and validate
-        self.val_every_k_epoch = cfg.val_every_k_epoch
-        self.upadte_grad_every_k_batch = 1
 
         self.best_mAP = 0
         self.best_mAP_epoch = 0
@@ -98,7 +107,14 @@ class Trainer:
                     'bestmovingAvg':self.bestMovingAvg,
                     'bestmovingAvgEpoch':self.bestMovingAvgEpoch}
         path = os.path.join(self.checkpoints,'epoch_'+idx+'.pt')
-        torch.save(saveDict,path)                  
+        torch.save(saveDict,path)
+    def load_pre_train(self):
+        model_path = os.path.join(self.checkpoints,'pre.pt')
+        if os.path.exists(model_path):
+            print('load from:'+model_path)
+            info = torch.load(model_path)
+            self.net.load_state_dict(info['net'],strict= False)
+        self.start = 0                
     def load_epoch(self,idx):
         model_path = os.path.join(self.checkpoints,'epoch_'+idx+'.pt')
         if os.path.exists(model_path):
@@ -136,11 +152,11 @@ class Trainer:
                 torch.cuda.max_memory_allocated() / 1024 / 1024, torch.cuda.memory_allocated() / 1024 / 1024))
 
     def train_one_epoch(self):
-        running_loss ={'xy':0.0,'wh':0.0,'conf':0.0,'cls':0.0,'obj':0.0,'all':0.0,'iou':0.0,'gou':0.0}
+        running_loss ={'xy':0.0,'wh':0.0,'conf':0.0,'cls':0.0,'obj':0.0,'all':0.0,'iou':0.0,'gou':0.0,'cls_p':0.0}
         self.net.train()
         n = len(self.trainset)
         self.loss.not_match = 0
-        for i,data in tqdm(enumerate(self.trainset)):
+        for data in tqdm(self.trainset):
             inputs,labels = data
             outs = self.net(inputs.to(self.device).float())
             labels = labels.to(self.device).float()
@@ -152,13 +168,12 @@ class Trainer:
                     if np.isnan(display[k]):
                         continue
                     running_loss[k] += display[k]/n
+            self.optimizer.zero_grad()
             loss.backward()
             #solve gradient explosion problem caused by large learning rate or small batch size
             #nn.utils.clip_grad_value_(self.net.parameters(), clip_value=2.0) 
             nn.utils.clip_grad_norm_(self.net.parameters(),max_norm=2.0)
-            if i == n-1 or (i+1) % self.upadte_grad_every_k_batch == 0:
-                self.optimizer.step()
-                self.optimizer.zero_grad()
+            self.optimizer.step()
             del loss
         self.logMemoryUsage()
         print(f'#Gt not matched:{self.loss.not_match}')
@@ -172,7 +187,6 @@ class Trainer:
         print(self.optimizer.param_groups[0]['lr'])
         epoch = self.start
         stop_epochs = 0
-        #torch.autograd.set_detect_anomaly(True)
         while epoch < self.total and stop_epochs<self.early_stop_epochs:
             running_loss = self.train_one_epoch()            
             lr = self.optimizer.param_groups[0]['lr']
@@ -187,7 +201,7 @@ class Trainer:
                 self.save_epoch(str(epoch),epoch)
             if (epoch+1)%self.save_every_k_epoch==0:
                 self.save_epoch(str(epoch),epoch)
-            if (epoch+1)%self.val_every_k_epoch==0:                
+            if (epoch+1)%self.val_every_k_epoch==0 and (self.val_every_k_epoch!=-1):                
                 metrics = self.validate(epoch,'val',self.save_pred)
                 self.logger.write_metrics(epoch,metrics,tosave)
                 mAP = metrics['mAP']
@@ -221,7 +235,7 @@ class Trainer:
                 batch_metrics[th] = []
             gt_labels = []
             pd_num = 0
-            for _,data in tqdm(enumerate(valset)):
+            for data in tqdm(valset):
                 inputs,labels,info = data
                 outs = self.net(inputs.to(self.device).float())
                 size = inputs.shape[-2:]
@@ -271,7 +285,7 @@ class Trainer:
         self.net.eval()
         res = {}
         with torch.no_grad():
-            for _,data in tqdm(enumerate(self.testset)):
+            for data in tqdm(self.testset):
                 inputs,info = data
                 outs = self.net(inputs.to(self.device).float())
                 size = inputs.shape[-2:]

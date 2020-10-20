@@ -303,9 +303,6 @@ def cal_tp_per_item(pds,gts,threshold=0.5):
         pd_idx = np.where(pds[:-1]==c)[0]
         pdbboxes = pds[pd_idx,:4].reshape(-1,4)
         gtbboxes = gts[gts[:,0] == c,1:].reshape(-1,4)
-        ##print(voc_indices[int(c)])
-        ##print(pdbboxes)
-        ##print(gtbboxes)
         nc = pdbboxes.shape[0]
         mc = gtbboxes.shape[0]
         selected = np.zeros(mc)
@@ -332,13 +329,13 @@ def cal_tp_per_item_wo_cls(pds,gts,threshold=0.5):
     n = pds.shape[0]
     tps = np.zeros(n)
     scores = pds[:,4]*pds[:,5]
-    pd_idx = np.where(pds[:-1]<21)[0]
-    pdbboxes = pds[pd_idx,:4].reshape(-1,4)
+    pdbboxes = pds[:,:4].reshape(-1,4)
     gtbboxes = gts[:,1:].reshape(-1,4)
     nc = pdbboxes.shape[0]
     mc = gtbboxes.shape[0]
     selected = np.zeros(mc)
     sel_ious = np.zeros(mc)
+    labels = np.unique(gts[:,0].astype(np.int))
     for i in range(nc):
         if mc == 0:
             break
@@ -346,10 +343,11 @@ def cal_tp_per_item_wo_cls(pds,gts,threshold=0.5):
         ious = iou_wt_center_np(pdbbox,gtbboxes)
         iou = ious.max()
         best = ious.argmax()
-        ##print(iou)
+        if pds[i,-1] not in labels:
+            continue
         if iou >=threshold  and selected[best] !=1:
             selected[best] = 1
-            tps[pd_idx[i]] = 1.0
+            tps[i] = 1.0
             mc -=1
             sel_ious[best] = iou
     if tps.sum()>gts.shape[0]:

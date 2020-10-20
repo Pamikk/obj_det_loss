@@ -130,7 +130,15 @@ class VOC_dataset(data.Dataset):
         self.annos = data
         self.mode = mode
         self.accm_batch = 0
-        self.size = random.choice(cfg.sizes)
+        if mode=='train':
+            if cfg.pretrain:
+                self.size = 256
+                self.sizes=[256]
+            else:
+                self.size = random.choice(cfg.sizes)
+                self.sizes = cfg.sizes
+        else:
+            self.size = cfg.size
     def __len__(self):
         return len(self.imgs)
 
@@ -197,7 +205,7 @@ class VOC_dataset(data.Dataset):
         else:
             #validation set
             img,pad = self.pad_to_square(img)
-            img = resize(img,(self.cfg.size,self.cfg.size))
+            img = resize(img,(self.size,self.size))
             data = self.img_to_tensor(img)
             info ={'size':(h,w),'img_id':name,'pad':pad}
             if self.mode=='val':
@@ -217,7 +225,7 @@ class VOC_dataset(data.Dataset):
         elif self.mode=='train':
             data,labels = list(zip(*batch))
             if self.accm_batch % 10 == 0:
-                self.size = random.choice(self.cfg.sizes)
+                self.size = random.choice(self.sizes)
             tsize = (self.size,self.size)
             self.accm_batch += 1
             data = torch.stack([F.interpolate(img.unsqueeze(0),tsize,mode='bilinear').squeeze(0) for img in data]) #multi-scale-training   

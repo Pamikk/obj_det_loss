@@ -37,10 +37,14 @@ class NonResidual(nn.Module):
 
         return y
 
+
 class YOLO(nn.Module):
     def __init__(self,cfg):
         super(YOLO,self).__init__()
+        self.pool = nn.AvgPool2d(kernel_size=3,stride=2,padding=1)        
         self.encoders = Darknet(os.path.join(cfg.pre_trained_path,'yolov3.weights'))
+        in_channel = self.encoders.out_channels[0]*4*4
+        self.pred = nn.Linear(in_channel,cfg.cls_num)
         self.out_channels = self.encoders.out_channels.copy()
         self.in_channel = self.out_channels.pop(0)
         self.relu = nn.LeakyReLU(0.1)
@@ -75,6 +79,7 @@ class YOLO(nn.Module):
         outs = list(range(len(self.decoders)))
         x = feats.pop(0)
         y = []
+        cls_res = self.pred(self.pool(x).flatten(start_dim=1))
         for i,decoders in enumerate(self.decoders):
             up,decoder,pred = decoders
             x = torch.cat([up(x)]+y,dim=1)
@@ -82,7 +87,7 @@ class YOLO(nn.Module):
             out = pred(x)
             outs[i] = out
             y = [feats.pop(0)]
-        return outs
+        return [cls_res,outs]
 class YOLO_SPP(YOLO):
     def __init__(self,cfg):
         super(YOLO_SPP,self).__init__(cfg)
@@ -119,6 +124,7 @@ class YOLO_SPP(YOLO):
         #spatial :[8,16,32,64,128] suppose inp is 256
         outs = []
         x = feats.pop(0)
+        cls_res = self.pred(self.pool(x).flatten(start_dim=1))
         x = self.conv1(x)
         x = torch.cat([maxpool(x) for maxpool in self.pools],dim=1)
         y = []
@@ -129,7 +135,7 @@ class YOLO_SPP(YOLO):
             out = pred(x)
             outs.append(out)
             y = [feats.pop(0)]
-        return outs
+        return [cls_res,outs]
 
     
 
