@@ -36,6 +36,7 @@ class Trainer:
         
         self.save_every_k_epoch = cfg.save_every_k_epoch #-1 for not save and validate
         self.val_every_k_epoch = cfg.val_every_k_epoch
+        self.pre_train = cfg.pretrain
         if cfg.pretrain:
             self.save_every_k_epoch=-1
             opt_state_dict = [{'params': list(net.encoders.parameters())+ list(net.pred.parameters())},
@@ -186,6 +187,10 @@ class Trainer:
         print(self.optimizer.param_groups[0]['lr'])
         epoch = self.start
         stop_epochs = 0
+        if self.pre_train:
+            valf = self.eval_pre
+        else:
+            valf = self.validate
         while epoch < self.total and stop_epochs<self.early_stop_epochs:
             running_loss = self.train_one_epoch()            
             lr = self.optimizer.param_groups[0]['lr']
@@ -201,7 +206,7 @@ class Trainer:
             if ((epoch+1)%self.save_every_k_epoch==0) and (self.save_every_k_epoch>-1):
                 self.save_epoch(str(epoch),epoch)
             if (epoch+1)%self.val_every_k_epoch==0 and (self.val_every_k_epoch!=-1):                
-                metrics = self.validate(epoch,'val',self.save_pred)
+                metrics = valf(epoch,'val',self.save_pred)
                 self.logger.write_metrics(epoch,metrics,tosave)
                 mAP = metrics['mAP']
                 if mAP >= self.best_mAP:
@@ -210,7 +215,7 @@ class Trainer:
                     self.save_epoch('best',epoch)
                 print(f"best so far with {self.best_mAP} at epoch:{self.best_mAP_epoch}")
                 if self.trainval:
-                    metrics = self.validate(epoch,'train',self.save_pred)
+                    metrics = valf(epoch,'train',self.save_pred)
                     self.logger.write_metrics(epoch,metrics,tosave,mode='Trainval')
                     mAP = metrics['mAP']
                     self._updateMetrics(mAP,epoch)
