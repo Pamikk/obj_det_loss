@@ -198,7 +198,7 @@ class Trainer:
                 stop_epochs +=1
             if lr_ != lr:
                 self.save_epoch(str(epoch),epoch)
-            if (epoch+1)%self.save_every_k_epoch==0:
+            if ((epoch+1)%self.save_every_k_epoch==0) and (self.save_every_k_epoch>-1):
                 self.save_epoch(str(epoch),epoch)
             if (epoch+1)%self.val_every_k_epoch==0 and (self.val_every_k_epoch!=-1):                
                 metrics = self.validate(epoch,'val',self.save_pred)

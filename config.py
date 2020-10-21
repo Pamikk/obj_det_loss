@@ -68,13 +68,13 @@ class Config:
             self.scale = 0.1
             self.valid_scale = 0.25
             #train_setting
-            self.lr = 0.01
+            self.lr = 0.1
             self.weight_decay=5e-4
             self.momentum = 0.9
             #lr_scheduler
-            self.min_lr = 5e-5
-            self.lr_factor = 0.25
-            self.patience = 12
+            self.min_lr = 1e-3
+            self.lr_factor = 0.1
+            self.patience = 10
             #exp_setting
             self.save_every_k_epoch = 15
             self.val_every_k_epoch = 10
