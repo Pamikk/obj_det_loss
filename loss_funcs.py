@@ -271,6 +271,8 @@ class LossAPI(nn.Module):
             self.bbox_losses[i] = Losses[loss](cfg)
     def forward(self,outs,gt=None,size=None,infer=False):
         if self.cls:
+            if infer:
+                return torch.sigmoid(outs[0])
             cls_loss = self.cls_loss(outs[0],gt)
             return {'cls_p':cls_loss.item()},cls_loss
         _,outs = outs

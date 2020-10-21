@@ -8,7 +8,7 @@ from tqdm import tqdm
 import os
 import json
 
-from utils import Logger,ap_per_class
+from utils import Logger,ap_per_class,eval_cls_acc
 from utils import non_maximum_supression as nms
 from utils import cal_tp_per_item_wo_cls as cal_tp
 tosave = ['mAP']
@@ -37,7 +37,6 @@ class Trainer:
         self.save_every_k_epoch = cfg.save_every_k_epoch #-1 for not save and validate
         self.val_every_k_epoch = cfg.val_every_k_epoch
         if cfg.pretrain:
-            self.val_every_k_epoch=-1
             self.save_every_k_epoch=-1
             opt_state_dict = [{'params': list(net.encoders.parameters())+ list(net.pred.parameters())},
                               {'params': net.decoders.parameters(), 'lr': 0.0}]#freeze location part
@@ -280,6 +279,35 @@ class Trainer:
         if save:
             json.dump(res,open(os.path.join(self.predictions,'pred_epoch_'+str(epoch)+'.json'),'w'))
         
+        return metrics
+    def eval_pre(self,epoch,mode):
+        self.net.eval()
+        res = {}
+        print('start Validation Epoch:',epoch)
+        if mode=='val':
+            valset = self.valset
+        else:
+            valset = self.trainval
+        with torch.no_grad():
+            AP,R,P= 0,0,0
+            gt_labels = []
+            pd_num = 0
+            for data in tqdm(valset):
+                inputs,labels,_ = data
+                outs = self.net(inputs.to(self.device).float())
+                size = inputs.shape[-2:]
+                pds = self.loss(outs,size=size,infer=True)
+                nB = pds.shape[0]
+                gt_labels += labels[:,1].tolist()               
+                for b in range(nB):
+                    pred = pds[b]
+                    gt = labels[labels[:,0]==b,1:].reshape(-1,5)
+                    pd_num+=1
+                    p,r,ap = eval_cls_acc(pred,gt,self.conf_threshold)
+                    AP+=ap
+                    R+=r
+                    P+=p
+        metrics = {'Precision':P/pd_num,'Recall':R/pd_num,'mAP':AP/pd_num,}        
         return metrics
     def test(self):
         self.net.eval()

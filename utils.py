@@ -421,7 +421,18 @@ def cal_metrics_wo_cls(pd,gt,threshold=0.5):
         return 0,0,0
     else:
         return 1,1,1
-    
+def eval_cls_acc(pds,gts,conf_threshold=0.95):
+    tp = (pds[gts[:,0].long()]>conf_threshold).sum().item().float()
+    fp = len(pds)-tp
+    fn = len(gts)-tp
+    m = len(gts)
+    n = len(pds)
+    if (m==0) and (n==0):
+        return 1,1,1
+    elif m==0 or n==0:
+        return 0,0,0
+    else:
+        return tp/n,tp/m,tp/(tp+fp+fn)
 def non_maximum_supression(preds,conf_threshold=0.5,nms_threshold = 0.4):
     preds = preds[preds[:,4]>conf_threshold]
     if len(preds) == 0:
