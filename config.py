@@ -77,7 +77,7 @@ class Config:
             self.patience = 10
             #exp_setting
             self.save_every_k_epoch = 15
-            self.val_every_k_epoch = 10
+            self.val_every_k_epoch = 5
             self.adjust_lr = False
             #loss hyp
             self.obj_scale = 2
