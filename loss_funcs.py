@@ -256,9 +256,9 @@ class CLS_loss(nn.Module):
     def forward(self,pd,gt):
         bn = pd.shape[0]
         target = torch.zeros([bn,self.cnum],dtype=torch.float,device=pd.device)
-        target[gt[:,0].long(),gt[:,-1].long()] = 1
+        target[gt[:,0].long(),gt[:,1].long()] = 1
         pd = torch.sigmoid(pd)
-        return bce_loss(pd,target)+dice_loss(pd,target)
+        return dice_loss(pd,target)
 class LossAPI(nn.Module):
     def __init__(self,cfg,loss):
         super(LossAPI,self).__init__()

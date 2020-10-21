@@ -199,7 +199,6 @@ class Trainer:
             self.lr_sheudler.step(running_loss['all'])
             lr_ = self.optimizer.param_groups[0]['lr']
             if lr_ == self.cfg.min_lr:
-                print(lr_-self.cfg.min_lr)
                 stop_epochs +=1
             if lr_ != lr:
                 self.save_epoch(str(epoch),epoch)
@@ -213,12 +212,13 @@ class Trainer:
                     self.best_mAP = mAP
                     self.best_mAP_epoch = epoch
                     self.save_epoch('best',epoch)
-                print(f"best so far with {self.best_mAP} at epoch:{self.best_mAP_epoch}")
+                
                 if self.trainval:
                     metrics = valf(epoch,'train',self.save_pred)
                     self.logger.write_metrics(epoch,metrics,tosave,mode='Trainval')
                     mAP = metrics['mAP']
                     self._updateMetrics(mAP,epoch)
+            print(f"best so far with {self.best_mAP} at epoch:{self.best_mAP_epoch}")
             epoch +=1
                 
         print("Best mAP: {:.4f} at epoch {}".format(self.best_mAP, self.best_mAP_epoch))
@@ -285,9 +285,8 @@ class Trainer:
             json.dump(res,open(os.path.join(self.predictions,'pred_epoch_'+str(epoch)+'.json'),'w'))
         
         return metrics
-    def eval_pre(self,epoch,mode):
+    def eval_pre(self,epoch,mode,_save):
         self.net.eval()
-        res = {}
         print('start Validation Epoch:',epoch)
         if mode=='val':
             valset = self.valset

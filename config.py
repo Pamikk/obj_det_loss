@@ -73,7 +73,7 @@ class Config:
             self.momentum = 0.9
             #lr_scheduler
             self.min_lr = 1e-3
-            self.lr_factor = 0.1
+            self.lr_factor = 0.25
             self.patience = 10
             #exp_setting
             self.save_every_k_epoch = 15
