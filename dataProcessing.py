@@ -130,15 +130,14 @@ class VOC_dataset(data.Dataset):
         self.annos = data
         self.mode = mode
         self.accm_batch = 0
-        if mode=='train':
-            if cfg.pretrain:
-                self.size = 256
-                self.sizes=[256]
-            else:
-                self.size = random.choice(cfg.sizes)
-                self.sizes = cfg.sizes
+        if mode=='train':            
+            self.size = random.choice(cfg.sizes)
+            self.sizes = cfg.sizes
         else:
             self.size = cfg.size
+        if cfg.pretrain:
+            self.size = 256
+            self.sizes=[256]
     def __len__(self):
         return len(self.imgs)
 

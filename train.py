@@ -68,6 +68,8 @@ if __name__ == "__main__":
     cfgs['trainval'] = cfg('trainval')
     cfgs['val'] = cfg('val')
     cfgs['test'] = cfg('test')
+    for k in cfgs:
+        cfgs[k].pretrain = args.pretrain
     main(args,cfgs)
     
     
