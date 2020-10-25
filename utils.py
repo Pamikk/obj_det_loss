@@ -422,7 +422,7 @@ def cal_metrics_wo_cls(pd,gt,threshold=0.5):
     else:
         return 1,1,1
 def eval_cls_acc(pds,gts,conf_threshold=0.95):
-    tp = (pds[gts[:,0].long()]>conf_threshold).sum().item().float()
+    tp = (pds[gts[:,0].long()]>conf_threshold).sum().float().item()
     fp = len(pds)-tp
     fn = len(gts)-tp
     m = len(gts)
