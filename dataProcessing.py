@@ -173,7 +173,7 @@ class VOC_dataset(data.Dataset):
         diff2 = abs(w-ts)
         pad = (diff1//2,diff2//2,diff1-diff1//2,diff2-diff2//2)
         img = cv2.copyMakeBorder(img,pad[0],pad[2],pad[1],pad[3],cv2.BORDER_CONSTANT,0)
-        return img,(pad[0],pad[1])
+        return img,(diff1,diff2)
 
     def __getitem__(self,idx):
         name = self.imgs[idx]
@@ -196,8 +196,8 @@ class VOC_dataset(data.Dataset):
                 img,labels = rotate(img,labels,ang,scale)
             img,pad = self.pad_to_square(img)
             size = img.shape[0]
-            labels[:,ls]+=pad[1]
-            labels[:,ls+1]+=pad[0]
+            labels[:,ls]+=pad[1]//2
+            labels[:,ls+1]+=pad[0]//2
             data = self.img_to_tensor(img)
             labels = self.normalize_gts(labels,size)
             return data,labels      

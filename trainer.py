@@ -257,14 +257,14 @@ class Trainer:
                     ##if pred_nms.shape[0]>0:
                       ## print(pred_nms[0])
                     name = info['img_id'][b]
-                    size = info['size'][b]
+                    tsize = info['size'][b]
                     pad = info['pad'][b]
                     ##print(name)
                     ##print(pad)
                     gt = labels[labels[:,0]==b,1:].reshape(-1,5)                   
-                    pred_nms[:,:4]*=max(size)
-                    pred_nms[:,0] -= pad[1]
-                    pred_nms[:,1] -= pad[0]
+                    pred_nms[:,:4]*=maxt(tsize)
+                    pred[:,0] -= (pad[1]//2)*(tsize/(size-pad[1]))
+                    pred[:,1] -= (pad[0]//2)*(tsize/(size-pad[0])) 
                     pd_num+=pred_nms.shape[0]
                     ##if pred_nms.shape[0]>0:
                       ## print(pred_nms[0])
@@ -329,8 +329,8 @@ class Trainer:
                     tsize = info['size'][b]
                     pad = info['pad'][b]
                     pred[:,:4]*=max(tsize)
-                    pred[:,0] -= pad[1]
-                    pred[:,1] -= pad[0]
+                    pred[:,0] -= (pad[1]//2)*(tsize/(size-pad[1]))
+                    pred[:,1] -= (pad[0]//2)*(tsize/(size-pad[0])) 
                     cls_confs,cls_labels = torch.max(pred[:,5:],dim=1,keepdim=True)
                     pred_nms = torch.cat((pred[:,:5],cls_confs,cls_labels.float()),dim=1)                    
                     #pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)
