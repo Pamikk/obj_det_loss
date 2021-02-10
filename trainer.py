@@ -33,7 +33,7 @@ class Trainer:
         self.checkpoints = os.path.join(cfg.checkpoint,name)
         self.device = cfg.device
         self.net = self.net
-        self.optimizer = optim.SGD(self.net.parameters(),lr=cfg.lr,weight_decay=cfg.weight_decay,momentum =cfg.momentum)
+        self.optimizer = optim.Adam(self.net.parameters(),lr=cfg.lr)
         self.lr_sheudler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,mode='min', factor=cfg.lr_factor, threshold=0.0001,patience=cfg.patience,min_lr=cfg.min_lr)
         if not(os.path.exists(self.checkpoints)):
             os.mkdir(self.checkpoints)
@@ -135,6 +135,7 @@ class Trainer:
                 torch.cuda.max_memory_allocated() / 1024 / 1024, torch.cuda.memory_allocated() / 1024 / 1024))
 
     def train_one_epoch(self):
+        self.optimizer.zero_grad()
         running_loss ={'xy':0.0,'wh':0.0,'conf':0.0,'cls':0.0,'obj':0.0,'all':0.0,'iou':0.0,'gou':0.0}
         self.net.train()
         n = len(self.trainset)
@@ -152,9 +153,8 @@ class Trainer:
             #solve gradient explosion problem caused by large learning rate or small batch size
             #nn.utils.clip_grad_value_(self.net.parameters(), clip_value=2.0) 
             nn.utils.clip_grad_norm_(self.net.parameters(),max_norm=2.0)
-            if i == n-1 or (i+1) % self.upadte_grad_every_k_batch == 0:
-                self.optimizer.step()
-                self.optimizer.zero_grad()
+            self.optimizer.step()
+            self.optimizer.zero_grad()
             del loss
         self.logMemoryUsage()
         print(f'#Gt not matched:{self.net.loss.not_match}')
