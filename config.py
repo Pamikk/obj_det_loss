@@ -47,7 +47,7 @@ class Config:
         self.multiscale = 3
         self.sizes = list(range(self.size-32*self.multiscale,self.size+32*self.multiscale+1,32)) 
         self.nms_threshold = 0.5
-        self.dc_threshold = 0.95
+        self.dc_threshold = 0.9
 
         self.anchors= anchors  
         self.anchor_divide=[(6,7,8),(3,4,5),(0,1,2)]
@@ -82,7 +82,7 @@ class Config:
             self.obj_scale = 2
             self.noobj_scale = 10
             self.cls_scale = 10
-            self.ignore_threshold = 0.7
+            self.ignore_threshold = 0.5
             self.match_threshold = 0.01#regard as match above this threshold
 
         elif mode=='val':
