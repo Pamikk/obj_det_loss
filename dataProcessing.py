@@ -130,14 +130,7 @@ class VOC_dataset(data.Dataset):
         self.annos = data
         self.mode = mode
         self.accm_batch = 0
-        if mode=='train':            
-            self.size = random.choice(cfg.sizes)
-            self.sizes = cfg.sizes
-        else:
-            self.size = cfg.size
-        if cfg.pretrain:
-            self.size = 256
-            self.sizes=[256]
+        self.size = random.choice(cfg.sizes)
     def __len__(self):
         return len(self.imgs)
 
@@ -173,7 +166,7 @@ class VOC_dataset(data.Dataset):
         diff2 = abs(w-ts)
         pad = (diff1//2,diff2//2,diff1-diff1//2,diff2-diff2//2)
         img = cv2.copyMakeBorder(img,pad[0],pad[2],pad[1],pad[3],cv2.BORDER_CONSTANT,0)
-        return img,(diff1,diff2)
+        return img,(pad[0],pad[1])
 
     def __getitem__(self,idx):
         name = self.imgs[idx]
@@ -196,15 +189,15 @@ class VOC_dataset(data.Dataset):
                 img,labels = rotate(img,labels,ang,scale)
             img,pad = self.pad_to_square(img)
             size = img.shape[0]
-            labels[:,ls]+=pad[1]//2
-            labels[:,ls+1]+=pad[0]//2
+            labels[:,ls]+= pad[1]
+            labels[:,ls+1]+= pad[0]
             data = self.img_to_tensor(img)
             labels = self.normalize_gts(labels,size)
             return data,labels      
         else:
             #validation set
             img,pad = self.pad_to_square(img)
-            img = resize(img,(self.size,self.size))
+            img = resize(img,(self.cfg.size,self.cfg.size))
             data = self.img_to_tensor(img)
             info ={'size':(h,w),'img_id':name,'pad':pad}
             if self.mode=='val':
@@ -224,7 +217,7 @@ class VOC_dataset(data.Dataset):
         elif self.mode=='train':
             data,labels = list(zip(*batch))
             if self.accm_batch % 10 == 0:
-                self.size = random.choice(self.sizes)
+                self.size = random.choice(self.cfg.sizes)
             tsize = (self.size,self.size)
             self.accm_batch += 1
             data = torch.stack([F.interpolate(img.unsqueeze(0),tsize,mode='bilinear').squeeze(0) for img in data]) #multi-scale-training   

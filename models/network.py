@@ -3,16 +3,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 import os
 
-from .backbone import ResNet,conv1x1,conv3x3,Darknet 
+from .backbone import ResNet,conv1x1,conv3x3,Darknet
+from .loss_funcs import  LossAPI
 def init_weights(m):
     if type(m) == nn.Conv2d:
         torch.nn.init.kaiming_normal_(m.weight.data)
     elif type(m) == nn.BatchNorm2d:
         torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
         torch.nn.init.constant_(m.bias.data, 0.0)
-def NetAPI(cfg,net,init=True):
+def NetAPI(cfg,net,loss,init=True):
     networks = {'yolo':YOLO,'yolo_spp':YOLO_SPP}
-    network = networks[net](cfg)
+    network = networks[net](cfg,loss)
     if init:
         network.initialization()
     return network
@@ -37,14 +38,10 @@ class NonResidual(nn.Module):
 
         return y
 
-
 class YOLO(nn.Module):
-    def __init__(self,cfg):
+    def __init__(self,cfg,loss):
         super(YOLO,self).__init__()
-        self.pool = nn.AvgPool2d(kernel_size=3,stride=2,padding=1)        
         self.encoders = Darknet(os.path.join(cfg.pre_trained_path,'yolov3.weights'))
-        in_channel = self.encoders.out_channels[0]*4*4
-        self.pred = nn.Linear(in_channel,cfg.cls_num)
         self.out_channels = self.encoders.out_channels.copy()
         self.in_channel = self.out_channels.pop(0)
         self.relu = nn.LeakyReLU(0.1)
@@ -54,6 +51,7 @@ class YOLO(nn.Module):
             decoder = self.make_prediction(len(ind)*(cfg.cls_num+5),NonResidual,channels[i],upsample=i!=0)
             decoders.append(decoder)
         self.decoders = nn.ModuleList(decoders)
+        self.loss = LossAPI(cfg,loss)
     def initialization(self):
         for m in self.modules():
             init_weights(m)
@@ -72,14 +70,14 @@ class YOLO(nn.Module):
                 conv1x1(channel*block.multiple,out_channel,bias=True))
         self.in_channel = channel
         return nn.ModuleList([upsample,nn.Sequential(*decoders),pred])
-    def forward(self,x):
+    def forward(self,x,optimizer=None,gts=None):
+        size = x.shape[-2:]
         feats = self.encoders(x)
         #channels:[1024,512,256,128,64]
         #spatial :[8,16,32,64,128] suppose inp is 256
         outs = list(range(len(self.decoders)))
         x = feats.pop(0)
         y = []
-        cls_res = self.pred(self.pool(x).flatten(start_dim=1))
         for i,decoders in enumerate(self.decoders):
             up,decoder,pred = decoders
             x = torch.cat([up(x)]+y,dim=1)
@@ -87,10 +85,18 @@ class YOLO(nn.Module):
             out = pred(x)
             outs[i] = out
             y = [feats.pop(0)]
-        return [cls_res,outs]
+        if self.training:
+            display,loss = self.loss(outs,gts,size)
+            if optimizer!=None:
+                # for network like GAN
+                pass
+            else:          
+                return display,loss
+        else:
+            return  self.loss(outs,size=size,infer=True)
 class YOLO_SPP(YOLO):
-    def __init__(self,cfg):
-        super(YOLO_SPP,self).__init__(cfg)
+    def __init__(self,cfg,loss):
+        super(YOLO_SPP,self).__init__(cfg,loss)
         self.encoders = Darknet(os.path.join(cfg.pre_trained_path,'yolov3-spp.weights'))
         self.out_channels = self.encoders.out_channels.copy()
         self.in_channel = self.out_channels.pop(0)
@@ -118,13 +124,13 @@ class YOLO_SPP(YOLO):
                 conv1x1(channel*block.multiple,out_channel,bias=True))
         self.in_channel = channel
         return nn.ModuleList([upsample,nn.Sequential(*decoders),pred])
-    def forward(self,x):
+    def forward(self,x,optimizer=None,gts=None):
+        size = x.shape[-2:]
         feats = self.encoders(x)
         #channels:[1024,512,256,128,64]
         #spatial :[8,16,32,64,128] suppose inp is 256
         outs = []
         x = feats.pop(0)
-        cls_res = self.pred(self.pool(x).flatten(start_dim=1))
         x = self.conv1(x)
         x = torch.cat([maxpool(x) for maxpool in self.pools],dim=1)
         y = []
@@ -135,7 +141,16 @@ class YOLO_SPP(YOLO):
             out = pred(x)
             outs.append(out)
             y = [feats.pop(0)]
-        return [cls_res,outs]
+        display,loss = self.loss(outs,*gts)
+        if self.training:
+            display,loss = self.loss(outs,gts,size)
+            if optimizer!=None:
+                # for network like GAN
+                pass
+            else:          
+                return display,loss
+        else:
+            return  self.loss(outs,size=size,infer=True)
 
     
 

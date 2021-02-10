@@ -8,15 +8,15 @@ from tqdm import tqdm
 import os
 import json
 
-from utils import Logger,ap_per_class,eval_cls_acc
+from utils import Logger,ap_per_class
 from utils import non_maximum_supression as nms
-from utils import cal_tp_per_item_wo_cls as cal_tp
+from utils import cal_tp_per_item as cal_tp
 tosave = ['mAP']
 plot = [0.5,0.75] 
-thresholds = np.around(np.arange(0.5,0.96,0.05),2)
+thresholds = np.around(np.arange(0.5,0.75,0.05),2)
 
 class Trainer:
-    def __init__(self,cfg,datasets,net,loss,epoch):
+    def __init__(self,cfg,datasets,net,epoch):
         self.cfg = cfg
         if 'train' in datasets:
             self.trainset = datasets['train']
@@ -33,18 +33,7 @@ class Trainer:
         self.checkpoints = os.path.join(cfg.checkpoint,name)
         self.device = cfg.device
         self.net = self.net
-        
-        self.save_every_k_epoch = cfg.save_every_k_epoch #-1 for not save and validate
-        self.val_every_k_epoch = cfg.val_every_k_epoch
-        self.pre_train = cfg.pretrain
-        if cfg.pretrain:
-            self.save_every_k_epoch=-1
-            opt_state_dict = [{'params': list(net.encoders.parameters())+ list(net.pred.parameters())},
-                              {'params': net.decoders.parameters(), 'lr': 0.0}]#freeze location part
-        else:
-            opt_state_dict = [{'params': list(net.encoders.parameters())+ list(net.pred.parameters()),'lr':cfg.lr*0.1},
-                              {'params': net.decoders.parameters()}]
-        self.optimizer = optim.SGD(opt_state_dict,lr=cfg.lr,weight_decay=cfg.weight_decay,momentum =cfg.momentum)
+        self.optimizer = optim.SGD(self.net.parameters(),lr=cfg.lr,weight_decay=cfg.weight_decay,momentum =cfg.momentum)
         self.lr_sheudler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,mode='min', factor=cfg.lr_factor, threshold=0.0001,patience=cfg.patience,min_lr=cfg.min_lr)
         if not(os.path.exists(self.checkpoints)):
             os.mkdir(self.checkpoints)
@@ -54,13 +43,14 @@ class Trainer:
         start,total = epoch
         self.start = start        
         self.total = total
-        self.loss = loss
         log_dir = os.path.join(self.checkpoints,'logs')
         if not(os.path.exists(log_dir)):
             os.mkdir(log_dir)
-            self.load_pre_train()
         self.logger = Logger(log_dir)
         torch.cuda.empty_cache()
+        self.save_every_k_epoch = cfg.save_every_k_epoch #-1 for not save and validate
+        self.val_every_k_epoch = cfg.val_every_k_epoch
+        self.upadte_grad_every_k_batch = 1
 
         self.best_mAP = 0
         self.best_mAP_epoch = 0
@@ -76,7 +66,7 @@ class Trainer:
         self.adjust_lr = cfg.adjust_lr
         #load from epoch if required
         if start:
-            if start=='-1':
+            if (start=='-1')or (start== -1):
                 self.load_last_epoch()
             else:
                 self.load_epoch(start)
@@ -107,14 +97,7 @@ class Trainer:
                     'bestmovingAvg':self.bestMovingAvg,
                     'bestmovingAvgEpoch':self.bestMovingAvgEpoch}
         path = os.path.join(self.checkpoints,'epoch_'+idx+'.pt')
-        torch.save(saveDict,path)
-    def load_pre_train(self):
-        model_path = os.path.join(self.checkpoints,'pre.pt')
-        if os.path.exists(model_path):
-            print('load from:'+model_path)
-            info = torch.load(model_path)
-            self.net.load_state_dict(info['net'],strict= False)
-        self.start = 0                
+        torch.save(saveDict,path)                  
     def load_epoch(self,idx):
         model_path = os.path.join(self.checkpoints,'epoch_'+idx+'.pt')
         if os.path.exists(model_path):
@@ -152,32 +135,30 @@ class Trainer:
                 torch.cuda.max_memory_allocated() / 1024 / 1024, torch.cuda.memory_allocated() / 1024 / 1024))
 
     def train_one_epoch(self):
-        running_loss ={'xy':0.0,'wh':0.0,'conf':0.0,'cls':0.0,'obj':0.0,'all':0.0,'iou':0.0,'gou':0.0,'cls_p':0.0}
+        running_loss ={'xy':0.0,'wh':0.0,'conf':0.0,'cls':0.0,'obj':0.0,'all':0.0,'iou':0.0,'gou':0.0}
         self.net.train()
         n = len(self.trainset)
-        self.loss.not_match = 0
-        for data in tqdm(self.trainset):
+        for i,data in tqdm(enumerate(self.trainset)):
             inputs,labels = data
-            outs = self.net(inputs.to(self.device).float())
             labels = labels.to(self.device).float()
-            size = inputs.shape[-2:]
-            display,loss = self.loss(outs,labels,size)
-            del inputs,outs,labels
+            display,loss = self.net(inputs.to(self.device).float(),gts=labels)            
+            del inputs,labels
             for k in running_loss:
                 if k in display.keys():
                     if np.isnan(display[k]):
                         continue
                     running_loss[k] += display[k]/n
-            self.optimizer.zero_grad()
             loss.backward()
             #solve gradient explosion problem caused by large learning rate or small batch size
             #nn.utils.clip_grad_value_(self.net.parameters(), clip_value=2.0) 
             nn.utils.clip_grad_norm_(self.net.parameters(),max_norm=2.0)
-            self.optimizer.step()
+            if i == n-1 or (i+1) % self.upadte_grad_every_k_batch == 0:
+                self.optimizer.step()
+                self.optimizer.zero_grad()
             del loss
         self.logMemoryUsage()
-        print(f'#Gt not matched:{self.loss.not_match}')
-        self.loss.reset_notmatch()
+        print(f'#Gt not matched:{self.net.loss.not_match}')
+        self.net.loss.reset_notmatch()
         return running_loss
     def train(self):
         print("strat train:",self.name)
@@ -187,10 +168,7 @@ class Trainer:
         print(self.optimizer.param_groups[0]['lr'])
         epoch = self.start
         stop_epochs = 0
-        if self.pre_train:
-            valf = self.eval_pre
-        else:
-            valf = self.validate
+        #torch.autograd.set_detect_anomaly(True)
         while epoch < self.total and stop_epochs<self.early_stop_epochs:
             running_loss = self.train_one_epoch()            
             lr = self.optimizer.param_groups[0]['lr']
@@ -199,26 +177,26 @@ class Trainer:
             self.lr_sheudler.step(running_loss['all'])
             lr_ = self.optimizer.param_groups[0]['lr']
             if lr_ == self.cfg.min_lr:
+                print(lr_-self.cfg.min_lr)
                 stop_epochs +=1
             if lr_ != lr:
                 self.save_epoch(str(epoch),epoch)
-            if ((epoch+1)%self.save_every_k_epoch==0) and (self.save_every_k_epoch>-1):
+            if (epoch+1)%self.save_every_k_epoch==0:
                 self.save_epoch(str(epoch),epoch)
-            if (epoch+1)%self.val_every_k_epoch==0 and (self.val_every_k_epoch!=-1):                
-                metrics = valf(epoch,'val',self.save_pred)
+            if (epoch+1)%self.val_every_k_epoch==0:                
+                metrics = self.validate(epoch,'val',self.save_pred)
                 self.logger.write_metrics(epoch,metrics,tosave)
                 mAP = metrics['mAP']
                 if mAP >= self.best_mAP:
                     self.best_mAP = mAP
                     self.best_mAP_epoch = epoch
                     self.save_epoch('best',epoch)
-                
+                print(f"best so far with {self.best_mAP} at epoch:{self.best_mAP_epoch}")
                 if self.trainval:
-                    metrics = valf(epoch,'train',self.save_pred)
+                    metrics = self.validate(epoch,'train',self.save_pred)
                     self.logger.write_metrics(epoch,metrics,tosave,mode='Trainval')
                     mAP = metrics['mAP']
                     self._updateMetrics(mAP,epoch)
-            print(f"best so far with {self.best_mAP} at epoch:{self.best_mAP_epoch}")
             epoch +=1
                 
         print("Best mAP: {:.4f} at epoch {}".format(self.best_mAP, self.best_mAP_epoch))
@@ -239,11 +217,9 @@ class Trainer:
                 batch_metrics[th] = []
             gt_labels = []
             pd_num = 0
-            for data in tqdm(valset):
+            for _,data in tqdm(enumerate(valset)):
                 inputs,labels,info = data
-                outs = self.net(inputs.to(self.device).float())
-                size = inputs.shape[-2:]
-                pds = self.loss(outs,size=size,infer=True)
+                pds = self.net(inputs.to(self.device).float())
                 nB = pds.shape[0]
                 gt_labels += labels[:,1].tolist()               
                 for b in range(nB):
@@ -254,17 +230,13 @@ class Trainer:
                         result = [pds_,pad]
                         res[name] = result
                     pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)
-                    ##if pred_nms.shape[0]>0:
-                      ## print(pred_nms[0])
                     name = info['img_id'][b]
-                    tsize = info['size'][b]
+                    size = info['size'][b]
                     pad = info['pad'][b]
-                    ##print(name)
-                    ##print(pad)
                     gt = labels[labels[:,0]==b,1:].reshape(-1,5)                   
-                    pred_nms[:,:4]*=maxt(tsize)
-                    pred[:,0] -= (pad[1]//2)*(tsize/(size-pad[1]))
-                    pred[:,1] -= (pad[0]//2)*(tsize/(size-pad[0])) 
+                    pred_nms[:,:4] *= max(size)
+                    pred_nms[:,0] -= pad[1]
+                    pred_nms[:,1] -= pad[0]
                     pd_num+=pred_nms.shape[0]
                     ##if pred_nms.shape[0]>0:
                       ## print(pred_nms[0])
@@ -285,52 +257,22 @@ class Trainer:
             json.dump(res,open(os.path.join(self.predictions,'pred_epoch_'+str(epoch)+'.json'),'w'))
         
         return metrics
-    def eval_pre(self,epoch,mode,_save):
-        self.net.eval()
-        print('start Validation Epoch:',epoch)
-        if mode=='val':
-            valset = self.valset
-        else:
-            valset = self.trainval
-        with torch.no_grad():
-            AP,R,P= 0,0,0
-            gt_labels = []
-            pd_num = 0
-            for data in tqdm(valset):
-                inputs,labels,_ = data
-                outs = self.net(inputs.to(self.device).float())
-                size = inputs.shape[-2:]
-                pds = self.loss(outs,size=size,infer=True)
-                nB = pds.shape[0]
-                gt_labels += labels[:,1].tolist()               
-                for b in range(nB):
-                    pred = pds[b]
-                    gt = labels[labels[:,0]==b,1:].reshape(-1,5)
-                    pd_num+=1
-                    p,r,ap = eval_cls_acc(pred,gt,self.conf_threshold)
-                    AP+=ap
-                    R+=r
-                    P+=p
-        metrics = {'Precision':P/pd_num,'Recall':R/pd_num,'mAP':AP/pd_num,}        
-        return metrics
     def test(self):
         self.net.eval()
         res = {}
         with torch.no_grad():
-            for data in tqdm(self.testset):
+            for _,data in tqdm(enumerate(self.testset)):
                 inputs,info = data
-                outs = self.net(inputs.to(self.device).float())
-                size = inputs.shape[-2:]
-                pds = self.loss(outs,size=size,infer=True)
+                pds = self.net(inputs.to(self.device).float())
                 nB = pds.shape[0]
                 for b in range(nB):
                     pred = pds[b].view(-1,self.cfg.cls_num+5)
                     name = info['img_id'][b]
                     tsize = info['size'][b]
                     pad = info['pad'][b]
-                    pred[:,:4]*=max(tsize)
-                    pred[:,0] -= (pad[1]//2)*(tsize/(size-pad[1]))
-                    pred[:,1] -= (pad[0]//2)*(tsize/(size-pad[0])) 
+                    pred[:,:4]*= max(tsize)
+                    pred[:,0] -= pad[1]
+                    pred[:,1] -= pad[0]
                     cls_confs,cls_labels = torch.max(pred[:,5:],dim=1,keepdim=True)
                     pred_nms = torch.cat((pred[:,:5],cls_confs,cls_labels.float()),dim=1)                    
                     #pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)

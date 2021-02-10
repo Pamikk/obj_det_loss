@@ -4,8 +4,8 @@ import random
 import json
 
 from stats import kmeans
-anchors = [[23.887, 32.021], [54.734, 71.147], [71.077, 96.459], [121.573, 129.046], [138.858, 153.688], [206.027, 187.171], [219.306, 230.669], [330.67, 272.986], [352.267, 315.159]]
-dataset = 'VOC2007'
+anchors = [[10,13],  [16,30],  [33,23],  [30,61],  [62,45],  [59,119],  [116,90],  [156,198],  [373,326]]
+dataset = 'VOC2012'
 path =f'data/annotation_{dataset}.json' #annotation path for anchor calculation
 def cal_anchors(sizes=None,num=9):
     #As in https://github.com/eriklindernoren/PyTorch-YOLOv3
@@ -43,19 +43,18 @@ class Config:
         self.checkpoint='../checkpoints'
         self.cls_num = 20        
         self.res = 50
-        self.size = 416
+        self.size = 608
         self.multiscale = 3
         self.sizes = list(range(self.size-32*self.multiscale,self.size+32*self.multiscale+1,32)) 
         self.nms_threshold = 0.5
         self.dc_threshold = 0.95
 
         self.anchors= anchors  
-        self.anchor_divide=[(5,6,7,8),(3,4),(0,1,2)]
+        self.anchor_divide=[(6,7,8),(3,4,5),(0,1,2)]
         self.anchor_num = len(self.anchors)
         
         self.bs = 8       
         self.pre_trained_path = '../network_weights'
-        self.pretrain = False
         if mode=='train':
             self.file=f'./data/train_{dataset}.json'
             self.bs = 32 # batch size
@@ -68,16 +67,16 @@ class Config:
             self.scale = 0.1
             self.valid_scale = 0.25
             #train_setting
-            self.lr = 0.1
+            self.lr = 0.01
             self.weight_decay=5e-4
             self.momentum = 0.9
             #lr_scheduler
-            self.min_lr = 1e-3
+            self.min_lr = 5e-5
             self.lr_factor = 0.25
-            self.patience = 10
+            self.patience = 12
             #exp_setting
             self.save_every_k_epoch = 15
-            self.val_every_k_epoch = 5
+            self.val_every_k_epoch = 10
             self.adjust_lr = False
             #loss hyp
             self.obj_scale = 2

@@ -48,97 +48,6 @@ class Logger(object):
         self.write_line2file('val',tmp)
         writer.close()
 
-def iou_wo_center(w1,h1,w2,h2):
-    #assuming at the same center
-    #return a vector nx1
-    inter = torch.min(w1,w2)*torch.min(h1,h2)
-    union = w1*h1 + w2*h2 - inter
-    ious = inter/union
-    ious[ious!=ious] = torch.tensor(0.0) #avoid nans
-    return ious
-def generalized_iou(bbox1,bbox2):
-    #return shape nx1
-    bbox1 = bbox1.view(-1,4)
-    bbox2 = bbox2.view(-1,4)
-    assert bbox1.shape[0]==bbox2.shape[0]
-    #tranfer xc,yc,w,h to xmin ymin xmax ymax
-    xmin1 = bbox1[:,0] - bbox1[:,2]/2
-    xmin2 = bbox2[:,0] - bbox2[:,2]/2
-    ymin1 = bbox1[:,1] - bbox1[:,3]/2
-    ymin2 = bbox2[:,1] - bbox2[:,3]/2
-    xmax1 = bbox1[:,0] + bbox1[:,2]/2
-    xmax2 = bbox2[:,0] + bbox2[:,2]/2
-    ymax1 = bbox1[:,1] + bbox1[:,3]/2
-    ymax2 = bbox2[:,1] + bbox2[:,3]/2
-
-    inter_xmin = torch.max(xmin1,xmin2)
-    inter_xmax = torch.min(xmax1,xmax2)
-    inter_ymin = torch.max(ymin1,ymin2)
-    inter_ymax = torch.min(ymax1,ymax2)
-    cover_xmin = torch.min(xmin1,xmin2)
-    cover_xmax = torch.max(xmax1,xmax2)
-    cover_ymin = torch.min(ymin1,ymin2)
-    cover_ymax = torch.max(ymax1,ymax2)
-
-    inter_w = inter_xmax-inter_xmin
-    inter_h = inter_ymax-inter_ymin
-    mask = ((inter_w>=0 )&( inter_h >=0)).to(torch.float)
-    # detect not overlap
-    cover = (cover_xmax-cover_xmin)*(cover_ymax-cover_ymin)
-    #inter_h[inter_h<0] = 0
-    inter = inter_w*inter_h*mask
-    #keep iou<0 to avoid gradient diasppear
-    area1 = bbox1[:,2]*bbox1[:,3]
-    area2 = bbox2[:,2]*bbox2[:,3]
-    union = area1+area2 - inter
-    ious = inter/union
-    gious = ious-(cover-union)/cover
-    ious[ious!=ious] = torch.tensor(0.0) #avoid nans
-    gious[gious!=gious] = torch.tensor(0.0) #avoid nans
-    return ious,gious
-def cal_gious_matrix(bbox1,bbox2):
-    #return mxn matrix
-    bbox1 = bbox1.view(-1,4)
-    bbox2 = bbox2.view(-1,4)
-    
-    #tranfer xc,yc,w,h to xmin ymin xmax ymax
-    xmin1 = bbox1[:,0] - bbox1[:,2]/2
-    xmin2 = bbox2[:,0] - bbox2[:,2]/2
-    ymin1 = bbox1[:,1] - bbox1[:,3]/2
-    ymin2 = bbox2[:,1] - bbox2[:,3]/2
-    xmax1 = bbox1[:,0] + bbox1[:,2]/2
-    xmax2 = bbox2[:,0] + bbox2[:,2]/2
-    ymax1 = bbox1[:,1] + bbox1[:,3]/2
-    ymax2 = bbox2[:,1] + bbox2[:,3]/2
-
-    inter_xmin = torch.max(xmin1.view(-1,1),xmin2.view(1,-1))
-    inter_xmax = torch.min(xmax1.view(-1,1),xmax2.view(1,-1))
-    inter_ymin = torch.max(ymin1.view(-1,1),ymin2.view(1,-1))
-    inter_ymax = torch.min(ymax1.view(-1,1),ymax2.view(1,-1))
-    cover_xmin = torch.min(xmin1.view(-1,1),xmin2.view(1,-1))
-    cover_xmax = torch.max(xmax1.view(-1,1),xmax2.view(1,-1))
-    cover_ymin = torch.min(ymin1.view(-1,1),ymin2.view(1,-1))
-    cover_ymax = torch.max(ymax1.view(-1,1),ymax2.view(1,-1))
-
-    inter_w = inter_xmax-inter_xmin
-    inter_h = inter_ymax-inter_ymin
-    mask = ((inter_w>=0 )&( inter_h >=0)).to(torch.float)
-
-    # detect not overlap
-    cover = (cover_xmax-cover_xmin)*(cover_ymax-cover_ymin)
-    #inter_h[inter_h<0] = 0
-    inter = inter_w*inter_h*mask
-    #keep iou<0 to avoid gradient diasppear
-    area1 = bbox1[:,2]*bbox1[:,3]
-    area2 = bbox2[:,2]*bbox2[:,3]
-    union = area1.view(-1,1)+area2.view(1,-1)
-    union -= inter
-
-    ious = inter/union
-    gious = iou-(cover-union)/cover
-    ious[ious!=ious] = torch.tensor(0.0) #avoid nans
-    gous[gous!=gous] = torch.tensor(0.0) #avoid nans 
-    return ious,gious
 def iou_wt_center(bbox1,bbox2):
     #only for torch, return a vector nx1
     bbox1 = bbox1.view(-1,4)
@@ -172,7 +81,7 @@ def iou_wt_center(bbox1,bbox2):
     area2 = bbox2[:,2]*bbox2[:,3]
     union = area1+area2 - inter
     ious = inter/union
-    ious[ious!=ious] = torch.tensor(0.0)
+    ious[ious!=ious] = torch.tensor(0.0,device='cuda')
     return ious
 def iou_wt_center_np(bbox1,bbox2):
     #in numpy,only for evaluation,return a matrix m x n
@@ -303,6 +212,9 @@ def cal_tp_per_item(pds,gts,threshold=0.5):
         pd_idx = np.where(pds[:-1]==c)[0]
         pdbboxes = pds[pd_idx,:4].reshape(-1,4)
         gtbboxes = gts[gts[:,0] == c,1:].reshape(-1,4)
+        ##print(voc_indices[int(c)])
+        ##print(pdbboxes)
+        ##print(gtbboxes)
         nc = pdbboxes.shape[0]
         mc = gtbboxes.shape[0]
         selected = np.zeros(mc)
@@ -329,13 +241,13 @@ def cal_tp_per_item_wo_cls(pds,gts,threshold=0.5):
     n = pds.shape[0]
     tps = np.zeros(n)
     scores = pds[:,4]*pds[:,5]
-    pdbboxes = pds[:,:4].reshape(-1,4)
+    pd_idx = np.where(pds[:-1]<21)[0]
+    pdbboxes = pds[pd_idx,:4].reshape(-1,4)
     gtbboxes = gts[:,1:].reshape(-1,4)
     nc = pdbboxes.shape[0]
     mc = gtbboxes.shape[0]
     selected = np.zeros(mc)
     sel_ious = np.zeros(mc)
-    labels = np.unique(gts[:,0].astype(np.int))
     for i in range(nc):
         if mc == 0:
             break
@@ -343,11 +255,10 @@ def cal_tp_per_item_wo_cls(pds,gts,threshold=0.5):
         ious = iou_wt_center_np(pdbbox,gtbboxes)
         iou = ious.max()
         best = ious.argmax()
-        if pds[i,-1] not in labels:
-            continue
+        ##print(iou)
         if iou >=threshold  and selected[best] !=1:
             selected[best] = 1
-            tps[i] = 1.0
+            tps[pd_idx[i]] = 1.0
             mc -=1
             sel_ious[best] = iou
     if tps.sum()>gts.shape[0]:
@@ -421,18 +332,7 @@ def cal_metrics_wo_cls(pd,gt,threshold=0.5):
         return 0,0,0
     else:
         return 1,1,1
-def eval_cls_acc(pds,gts,conf_threshold=0.95):
-    tp = (pds[gts[:,0].long()]>conf_threshold).sum().float().item()
-    fp = len(pds)-tp
-    fn = len(gts)-tp
-    m = len(gts)
-    n = len(pds)
-    if (m==0) and (n==0):
-        return 1,1,1
-    elif m==0 or n==0:
-        return 0,0,0
-    else:
-        return tp/n,tp/m,tp/(tp+fp+fn)
+    
 def non_maximum_supression(preds,conf_threshold=0.5,nms_threshold = 0.4):
     preds = preds[preds[:,4]>conf_threshold]
     if len(preds) == 0:

@@ -1,7 +1,8 @@
 import torch.nn as nn
 import torch
 import numpy as np
-from utils import iou_wo_center,generalized_iou
+
+from .utils import iou_wo_center,generalized_iou
 #Functional Utils
 mse_loss = nn.MSELoss()
 bce_loss = nn.BCELoss()
@@ -119,7 +120,7 @@ class YOLOLoss(nn.Module):
         ws = pred[...,2]
         hs = pred[...,3]
         conf = torch.sigmoid(pred[...,4])#Object score
-        cls_score = torch.softmax(pred[...,5:])
+        cls_score = torch.sigmoid(pred[...,5:])
         #grid,anchors
         
 
@@ -249,33 +250,16 @@ class YOLOLoss_com(YOLOLoss):
         res['iou'] = loss_iou.item()
         res['gou'] = loss_gou.item()
         return loss_gou+loss_bbox,res
-class CLS_loss(nn.Module):
-    def __init__(self,cls_num):
-        super(CLS_loss,self).__init__()
-        self.cnum = cls_num
-    def forward(self,pd,gt):
-        bn = pd.shape[0]
-        target = torch.zeros([bn,self.cnum],dtype=torch.float,device=pd.device)
-        target[gt[:,0].long(),gt[:,1].long()] = 1
-        pd = torch.sigmoid(pd)
-        return dice_loss(pd,target)
+
 class LossAPI(nn.Module):
     def __init__(self,cfg,loss):
         super(LossAPI,self).__init__()
         self.bbox_losses = cfg.anchor_divide.copy()
         self.not_match = 0
-        self.cls = cfg.pretrain
-        self.cls_loss = CLS_loss(cfg.cls_num)
         for i,ind in enumerate(cfg.anchor_divide):
             cfg.anchor_ind = ind
             self.bbox_losses[i] = Losses[loss](cfg)
     def forward(self,outs,gt=None,size=None,infer=False):
-        if self.cls:
-            if infer:
-                return torch.sigmoid(outs[0])
-            cls_loss = self.cls_loss(outs[0],gt)
-            return {'cls_p':cls_loss.item()},cls_loss
-        _,outs = outs
         if infer:
             res = []
             for out,loss in zip(outs,self.bbox_losses):

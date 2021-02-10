@@ -9,7 +9,6 @@ from dataProcessing import VOC_dataset as dataset
 from models.network import NetAPI
 from trainer import Trainer
 import warnings
-from loss_funcs import LossAPI
 from config import cal_anchors
 
 warnings.filterwarnings('ignore')
@@ -19,7 +18,6 @@ def main(args,cfgs):
     val_cfg = cfgs['val']
     trainval_cfg = cfgs['trainval']
     test_cfg = cfgs['test']
-    config.pretrain = args.pretrain
     train_set = dataset(config)
     val_set = dataset(val_cfg,mode='val')
     trainval_set = dataset(trainval_cfg,mode='val')
@@ -33,14 +31,12 @@ def main(args,cfgs):
     config.device = torch.device("cuda")
     torch.cuda.empty_cache()
     #network
-    
     if args.anchors:
         print('calculating new anchors')
         config.anchors,_ = cal_anchors(config.size)
-    network = NetAPI(config,args.net)
-    loss = LossAPI(config,args.loss)
+    network = NetAPI(config,args.net,args.loss)
     torch.cuda.empty_cache()
-    det = Trainer(config,datasets,network,loss,(args.resume,args.epochs))
+    det = Trainer(config,datasets,network,(args.resume,args.epochs))
     if args.mode=='val':
         #metrics = det.validate(det.start-1,mode='val')        
         #det.logger.write_metrics(det.start-1,metrics,[])
@@ -61,15 +57,14 @@ if __name__ == "__main__":
     parser.add_argument("--net",type=str,default='yolo',help="network type:yolo")
     parser.add_argument("--bs",type=int,default=16,help="batchsize")
     parser.add_argument("--anchors",action='store_true')
-    parser.add_argument("--pretrain",action='store_true')
     args = parser.parse_args()
     cfgs = {}
+    
+    #Generate config for different dataset
     cfgs['train'] = cfg()
     cfgs['trainval'] = cfg('trainval')
     cfgs['val'] = cfg('val')
     cfgs['test'] = cfg('test')
-    for k in cfgs:
-        cfgs[k].pretrain = args.pretrain
     main(args,cfgs)
     
     
