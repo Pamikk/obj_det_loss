@@ -137,7 +137,7 @@ class VOC_dataset(data.Dataset):
     def img_to_tensor(self,img):
         data = torch.tensor(np.transpose(img,[2,0,1]),dtype=torch.float)
         if data.max()>1:
-             data /= 255.0
+             data[:,ls:] /= 255.0
         return data
     def gen_gts(self,anno):
         gts = torch.zeros((anno['obj_num'],ls+4),dtype=torch.float)
