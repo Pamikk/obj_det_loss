@@ -67,7 +67,7 @@ class Config:
             self.scale = 0.1
             self.valid_scale = 0.25
             #train_setting
-            self.lr = 0.001
+            self.lr = 0.1
             self.weight_decay=5e-4
             self.momentum = 0.9
             #lr_scheduler
@@ -83,8 +83,8 @@ class Config:
             self.noobj_scale = 100
             self.cls_scale = 1
             self.ignore_threshold = 0.5
-            self.match_threshold = 0.01#regard as match above this threshold
-
+            self.match_threshold = 0#regard as match above this threshold
+            self.base_epochs = [3,8]#base epochs with large learning rate,adjust lr_facter with 0.1
         elif mode=='val':
             self.file = f'./data/val_{dataset}.json'
         elif mode=='trainval':

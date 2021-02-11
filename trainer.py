@@ -28,18 +28,23 @@ class Trainer:
         if 'test' in datasets:
             self.testset = datasets['test']
         self.net = net
+
         name = cfg.exp_name
         self.name = name
         self.checkpoints = os.path.join(cfg.checkpoint,name)
+
         self.device = cfg.device
         self.net = self.net
-        self.optimizer = optim.Adam(self.net.parameters(),lr=cfg.lr)
+
+        self.optimizer = optim.Adam(self.net.parameters(),lr=cfg.lr,weight_decay=cfg.weight_decay)
         self.lr_sheudler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,mode='min', factor=cfg.lr_factor, threshold=0.0001,patience=cfg.patience,min_lr=cfg.min_lr)
+        
         if not(os.path.exists(self.checkpoints)):
             os.mkdir(self.checkpoints)
         self.predictions = os.path.join(self.checkpoints,'pred')
         if not(os.path.exists(self.predictions)):
             os.mkdir(self.predictions)
+
         start,total = epoch
         self.start = start        
         self.total = total
@@ -54,25 +59,30 @@ class Trainer:
 
         self.best_mAP = 0
         self.best_mAP_epoch = 0
+        self.movingLoss = 0
+        self.bestMovingLoss = 0
+        self.bestMovingLossEpoch = 1e9
 
-        self.movingAvg = 0
-        self.bestMovingAvg = 0
-        self.bestMovingAvgEpoch = 1e9
         self.early_stop_epochs = 50
-        self.alpha = 0.95 #for update moving Avg
+        self.alpha = 0.75 #for update moving loss
+        self.lr_change= cfg.adjust_lr
+        self.base_epochs = cfg.base_epochs
+
+
         self.nms_threshold = cfg.nms_threshold
         self.conf_threshold = cfg.dc_threshold
         self.save_pred = False
-        self.adjust_lr = cfg.adjust_lr
+        
         #load from epoch if required
         if start:
-            if (start=='-1')or (start== -1):
+            if (start=='-1')or(start==-1):
                 self.load_last_epoch()
             else:
                 self.load_epoch(start)
         else:
             self.start = 0
         self.net = self.net.to(self.device)
+
     def load_last_epoch(self):
         files = os.listdir(self.checkpoints)
         idx = 0
@@ -93,9 +103,9 @@ class Trainer:
                     'epoch':epoch,
                     'mAP':self.best_mAP,
                     'mAP_epoch':self.best_mAP_epoch,
-                    'movingAvg':self.movingAvg,
-                    'bestmovingAvg':self.bestMovingAvg,
-                    'bestmovingAvgEpoch':self.bestMovingAvgEpoch}
+                    'movingLoss':self.movingLoss,
+                    'bestmovingLoss':self.bestMovingLoss,
+                    'bestmovingLossEpoch':self.bestMovingLossEpoch}
         path = os.path.join(self.checkpoints,'epoch_'+idx+'.pt')
         torch.save(saveDict,path)                  
     def load_epoch(self,idx):
@@ -104,7 +114,7 @@ class Trainer:
             print('load:'+model_path)
             info = torch.load(model_path)
             self.net.load_state_dict(info['net'])
-            if not(self.adjust_lr):
+            if not(self.lr_change):
                 self.optimizer.load_state_dict(info['optimizer'])#might have bugs about device
                 for state in self.optimizer.state.values():
                     for k, v in state.items():
@@ -114,32 +124,49 @@ class Trainer:
             self.start = info['epoch']+1
             self.best_mAP = info['mAP']
             self.best_mAP_epoch = info['mAP_epoch']
-            self.movingAvg = info['movingAvg']
-            self.bestMovingAvg = info['bestmovingAvg']
-            self.bestMovingAvgEpoch = info['bestmovingAvgEpoch']
+            self.movingLoss = info['movingLoss']
+            self.bestMovingLoss = info['bestmovingLoss']
+            self.bestMovingAvgEpoch = info['bestmovingLossEpoch']
         else:
             print('no such model at:',model_path)
             exit()
-    def _updateMetrics(self,mAP,epoch):
-        if self.movingAvg ==0:
-            self.movingAvg = mAP
+    def _updateRunningLoss(self,loss,epoch):
+        if self.movingLoss ==0:
+            self.movingLoss = loss
         else:
-            self.movingAvg = self.movingAvg * self.alpha + mAP*(1-self.alpha)
-        if self.bestMovingAvg<self.movingAvg:
-            self.bestMovingAvg = self.movingAvg
-            self.bestMovingAvgEpoch = epoch
+            self.movingLoss = self.movingLoss * self.alpha + loss*(1-self.alpha)
+        if self.bestMovingLoss>self.movingLoss:
+            self.bestMovingLoss = self.movingLoss
+            self.bestMovingLossEpoch = epoch
             self.save_epoch('bestm',epoch)
     def logMemoryUsage(self, additionalString=""):
         if torch.cuda.is_available():
             print(additionalString + "Memory {:.0f}Mb max, {:.0f}Mb current".format(
                 torch.cuda.max_memory_allocated() / 1024 / 1024, torch.cuda.memory_allocated() / 1024 / 1024))
-
+    def set_lr(self,lr):
+        #adjust learning rate manually
+        for param_group in self.optimizer.param_groups:
+            param_group['lr']=lr
+        #tbi:might set different lr to different kind of parameters
+    def adjust_lr(self,lr_factor):
+        #adjust learning rate manually
+        for param_group in self.optimizer.param_groups:
+            param_group['lr']*=lr_factor
+    def warm_up(self,epoch):
+        if len(self.base_epochs==0):
+            return False
+        if epoch <= self.base_epochs[-1]:
+            if epoch in self.base_epochs:
+                self.adjust_lr(0.1)
+            return True
+        else:
+            return False
     def train_one_epoch(self):
         self.optimizer.zero_grad()
         running_loss ={'xy':0.0,'wh':0.0,'conf':0.0,'cls':0.0,'obj':0.0,'all':0.0,'iou':0.0,'gou':0.0}
         self.net.train()
         n = len(self.trainset)
-        for i,data in tqdm(enumerate(self.trainset)):
+        for data in tqdm(self.trainset):
             inputs,labels = data
             labels = labels.to(self.device).float()
             display,loss = self.net(inputs.to(self.device).float(),gts=labels)            
@@ -174,7 +201,8 @@ class Trainer:
             lr = self.optimizer.param_groups[0]['lr']
             self.logger.write_loss(epoch,running_loss,lr)
             #step lr
-            self.lr_sheudler.step(running_loss['all'])
+            if not self.warm_up(epoch):
+                self.lr_sheudler.step(running_loss['all'])
             lr_ = self.optimizer.param_groups[0]['lr']
             if lr_ == self.cfg.min_lr:
                 print(lr_-self.cfg.min_lr)
@@ -217,7 +245,7 @@ class Trainer:
                 batch_metrics[th] = []
             gt_labels = []
             pd_num = 0
-            for _,data in tqdm(enumerate(valset)):
+            for data in tqdm(valset):
                 inputs,labels,info = data
                 pds = self.net(inputs.to(self.device).float())
                 nB = pds.shape[0]
@@ -261,7 +289,7 @@ class Trainer:
         self.net.eval()
         res = {}
         with torch.no_grad():
-            for _,data in tqdm(enumerate(self.testset)):
+            for data in tqdm(self.testset):
                 inputs,info = data
                 pds = self.net(inputs.to(self.device).float())
                 nB = pds.shape[0]
