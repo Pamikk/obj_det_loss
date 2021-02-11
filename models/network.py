@@ -55,7 +55,7 @@ class YOLO(nn.Module):
     def initialization(self):
         for m in self.modules():
             init_weights(m)
-        self.encoders.load_dark_net()
+        #self.encoders.load_dark_net()
     def make_prediction(self,out_channel,block,channel,upsample=True):
         if upsample:
             upsample = nn.Sequential(conv1x1(self.in_channel,channel),nn.BatchNorm2d(channel),
