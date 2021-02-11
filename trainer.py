@@ -126,7 +126,7 @@ class Trainer:
             self.best_mAP_epoch = info['mAP_epoch']
             self.movingLoss = info['movingLoss']
             self.bestMovingLoss = info['bestmovingLoss']
-            self.bestMovingAvgEpoch = info['bestmovingLossEpoch']
+            self.bestMovingLossEpoch = info['bestmovingLossEpoch']
         else:
             print('no such model at:',model_path)
             exit()
@@ -201,14 +201,13 @@ class Trainer:
             lr = self.optimizer.param_groups[0]['lr']
             self.logger.write_loss(epoch,running_loss,lr)
             #step lr
+            self._updateRunningLoss(running_loss['all'],epoch)
             if not self.warm_up(epoch):
-                self.lr_sheudler.step(running_loss['all'])
+                self.lr_sheudler.step(self.movingLoss)
             lr_ = self.optimizer.param_groups[0]['lr']
             if lr_ == self.cfg.min_lr:
                 print(lr_-self.cfg.min_lr)
                 stop_epochs +=1
-            if lr_ != lr:
-                self.save_epoch(str(epoch),epoch)
             if (epoch+1)%self.save_every_k_epoch==0:
                 self.save_epoch(str(epoch),epoch)
             if (epoch+1)%self.val_every_k_epoch==0:                
@@ -224,7 +223,6 @@ class Trainer:
                     metrics = self.validate(epoch,'train',self.save_pred)
                     self.logger.write_metrics(epoch,metrics,tosave,mode='Trainval')
                     mAP = metrics['mAP']
-                    self._updateMetrics(mAP,epoch)
             epoch +=1
                 
         print("Best mAP: {:.4f} at epoch {}".format(self.best_mAP, self.best_mAP_epoch))
