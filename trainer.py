@@ -153,7 +153,7 @@ class Trainer:
         for param_group in self.optimizer.param_groups:
             param_group['lr']*=lr_factor
     def warm_up(self,epoch):
-        if len(self.base_epochs==0):
+        if len(self.base_epochs)==0:
             return False
         if epoch <= self.base_epochs[-1]:
             if epoch in self.base_epochs:
