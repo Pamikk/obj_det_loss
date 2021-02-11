@@ -84,7 +84,7 @@ class Config:
             self.cls_scale = 1
             self.ignore_threshold = 0.5
             self.match_threshold = 0#regard as match above this threshold
-            self.base_epochs = [3,8]#base epochs with large learning rate,adjust lr_facter with 0.1
+            self.base_epochs = [1,3]#base epochs with large learning rate,adjust lr_facter with 0.1
         elif mode=='val':
             self.file = f'./data/val_{dataset}.json'
         elif mode=='trainval':
