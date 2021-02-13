@@ -25,24 +25,41 @@ nms_threshold = 0.5
 conf_threshold = 0
 tosave = ['mAP']
 plot = [0.5,0.75] 
-thresholds = np.around(np.arange(0.5,0.96,0.05),2)
+thresholds = np.around(np.arange(0.5,0.75,0.05),2)
 pds = json.load(open(os.path.join(cfg.checkpoint,'debug','pred','pred_test.json')))
 mAP = 0
 count = 0
 batch_metrics={}
+batch_metrics_={}
 for th in thresholds:
     batch_metrics[th] = []
+    batch_metrics_[th] = []
 gt_labels = []
 for i,img in tqdm(enumerate(gts.keys())):
-    pred = torch.tensor(pds[img])
+    res = pds[img]
+    pdbboxes = torch.tensor(res['pdbboxes'])
+    pad = res['pad']
+    size = res['size']
     gt = gen_gts(gts[img])
     gt_labels += gt[:,0].tolist()  
     pred_nms = nms(pred,conf_threshold, nms_threshold)
     total = 0
     for th in batch_metrics:
         batch_metrics[th].append(cal_tp_per_item(pred_nms,gt,th))
+        batch_metrics[th].append(cal_tp_per_item(pred_nms,gt,th))
 metrics = {}
 for th in batch_metrics:
+    tps,scores,pd_labels = [np.concatenate(x, 0) for x in list(zip(*batch_metrics[th]))]
+    precision, recall, AP,_,_ = ap_per_class(tps, scores, pd_labels, gt_labels)
+    mAP += np.mean(AP)
+    if th in plot:
+        metrics['AP/'+str(th)] = np.mean(AP)
+        metrics['Precision/'+str(th)] = np.mean(precision)
+        metrics['Recall/'+str(th)] = np.mean(recall)
+metrics['mAP'] = mAP/len(thresholds)
+for k in metrics:
+    print(k,':',metrics[k])
+for th in batch_metrics_:
     tps,scores,pd_labels = [np.concatenate(x, 0) for x in list(zip(*batch_metrics[th]))]
     precision, recall, AP,_,_ = ap_per_class(tps, scores, pd_labels, gt_labels)
     mAP += np.mean(AP)
