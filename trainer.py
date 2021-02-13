@@ -255,23 +255,23 @@ class Trainer:
                 gt_labels += labels[:,1].tolist()               
                 for b in range(nB):
                     pred = pds[b].view(-1,self.cfg.cls_num+5)
-                    if save:
-                        pds_ = list(pred.cpu().numpy().astype(float))
-                        pds_ = [list(pd) for pd in pds_]
-                        result 
-                        res[name] = result
-                    pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)
                     name = info['img_id'][b]
                     size = info['size'][b]
                     pad = info['pad'][b]
+                    if save:
+                        pds_ = list(pred.cpu().numpy().astype(float))
+                        pds_ = [list(pd) for pd in pds_]
+                        result ={'pdbboxes':pds_,'pad':pad,'size':size}
+                        res[name] = result
+                    pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)                    
                     gt = labels[labels[:,0]==b,1:].reshape(-1,5)                   
                     pred_nms[:,:4] *= max(size)
                     pred_nms[:,0] -= pad[1]
                     pred_nms[:,1] -= pad[0]
                     pd_num+=pred_nms.shape[0]
-                    if save:
+                    '''if save:
                         print(pred_nms)
-                        print(gt)
+                        print(gt)'''
                     count+=1
                     for th in batch_metrics:
                         batch_metrics[th].append(cal_tp(pred_nms,gt,th))

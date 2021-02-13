@@ -83,13 +83,12 @@ class YOLOLayer(nn.Module):
 
         output = torch.cat(
             (
-                pred_boxes.view(num_samples, -1, 4) * self.stride,
+                pred_boxes.view(num_samples, -1, 4) /self.grid_size,
                 pred_conf.view(num_samples, -1, 1),
                 pred_cls.view(num_samples, -1, self.num_classes),
             ),
             -1,
         )
-
         if infer:
             return output
         else:
@@ -237,11 +236,9 @@ class YOLOLoss(nn.Module):
         pd_bboxes[...,1] = ys + grid_y
         pd_bboxes[...,2] = torch.exp(ws)*self.anchors_w
         pd_bboxes[...,3] = torch.exp(hs)*self.anchors_h
-        nb = pred.shape[0]        
-        if infer:
-            pd_bboxes[...,[0,2]]/=self.grid_size[1]
-            pd_bboxes[...,[1,3]]/=self.grid_size[0]     
-            return torch.cat((pd_bboxes.view(nb,-1,4),conf.view(nb,-1,1),cls_score.view(nb,-1,self.cls_num)),dim=-1)
+        nb = pred.shape[0]       
+        if infer:   
+            return torch.cat((pd_bboxes.view(nb,-1,4)/self.grid_size[0],conf.view(nb,-1,1),cls_score.view(nb,-1,self.cls_num)),dim=-1)
         else:
             pds_bbox = (xs,ys,ws,hs,pd_bboxes)
             obj_mask,noobj_mask,tbboxes,tcls,tconf = self.build_target(pd_bboxes,gts)
@@ -363,19 +360,24 @@ class LossAPI(nn.Module):
     def __init__(self,cfg,loss):
         super(LossAPI,self).__init__()
         self.bbox_losses = cfg.anchor_divide.copy()
-        #self.bbox_losses_ = cfg.anchor_divide.copy()
+        self.bbox_losses_ = cfg.anchor_divide.copy()
         self.not_match = 0
         for i,ind in enumerate(cfg.anchor_divide):
             cfg.anchor_ind = ind
             self.bbox_losses[i] = Losses[loss](cfg)
-            #self.bbox_losses_[i] = Losses['yoloo'](cfg)
+            self.bbox_losses_[i] = Losses['yoloo'](cfg)
 
     def forward(self,outs,gt=None,size=None,infer=False):
         if infer:
             res = []
-            for out,loss in zip(outs,self.bbox_losses):
+            for out,loss in zip(outs,self.bbox_losses):#,self.bbox_losses_):
                 result = loss(out,gt,size,infer=True)
                 res.append(result)
+                '''result_ = loss_(out,gt,size,infer=True)
+                print(result)
+                print()
+                print(result_)'''
+                
             return torch.cat(res,dim=1)
         else:
             res ={'xy':0.0,'wh':0.0,'conf':0.0,'cls':0.0,'obj':0.0,'all':0.0,'iou':0.0,'gou':0.0}

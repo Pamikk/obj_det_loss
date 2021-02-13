@@ -39,6 +39,7 @@ def main(args,cfgs):
     if args.anchors:
         print('calculating new anchors')
         config.anchors,_ = cal_anchors(config.size)
+        print(config.anchors)
     network = NetAPI(config,args.net,args.loss)
     #network_ = NetAPI(config,'yoloo',args.loss)
     torch.cuda.empty_cache()

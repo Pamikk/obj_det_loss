@@ -47,14 +47,14 @@ class Config:
         self.multiscale = 3
         self.sizes = list(range(self.size-32*self.multiscale,self.size+32+1,32)) 
         self.nms_threshold = 0.5
-        self.dc_threshold = 0.9
+        self.dc_threshold = 0.5
 
         self.anchors= anchors  
         self.anchor_divide=[(6,7,8),(3,4,5),(0,1,2)]
         self.anchor_num = len(self.anchors)
         self.model_path = "models/yolov3.cfg"
         
-        self.bs = 8       
+        self.bs = 1       
         self.pre_trained_path = '../network_weights'
         self.augment = False
         if mode=='train':
@@ -83,7 +83,7 @@ class Config:
             self.adjust_lr = False
             #loss hyp
             self.obj_scale = 2
-            self.noobj_scale = 10
+            self.noobj_scale = 20
             self.cls_scale = 1
             self.ignore_threshold = 0.5
             self.match_threshold = 0#regard as match above this threshold
