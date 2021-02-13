@@ -5,7 +5,7 @@ import json
 
 from stats import kmeans
 
-anchors = [[32,48],  [72,71],  [83,126], [135,155],  [186,215],  [251,227],  [270,272],  [459,394],  [493,405]]
+anchors = [[29.284, 37.17], [48.59, 68.512], [92.746, 104.106], [99.166, 117.154], [176.774, 170.019], [192.706, 195.867], [210.518, 217.084], [378.964, 328.491], [390.686, 335.793]]
 dataset = 'VOC2007'
 path =f'data/annotation_{dataset}.json' #annotation path for anchor calculation
 def cal_anchors(sizes=None,num=9):
@@ -28,7 +28,7 @@ def cal_anchors(sizes=None,num=9):
                 scale = t
             else:
                 scale = sizes
-            allb.append((bw/t*scale,bh/t*scale))
+            allb.append((bw,bh))
     km = kmeans(allb,k=num,max_iters=1000)
     km.initialization()
     km.iter(0)
@@ -44,9 +44,9 @@ class Config:
         self.checkpoint='../checkpoints'
         self.cls_num = 20        
         self.res = 50
-        self.size = 608
+        self.size = 416
         self.multiscale = 3
-        self.sizes = list(range(self.size-32*self.multiscale,self.size+32+1,32)) 
+        self.sizes = list(range(self.size-32*self.multiscale,self.size+32*self.multiscale+1,32)) 
         self.nms_threshold = 0.5
         self.dc_threshold = 0.5
 
