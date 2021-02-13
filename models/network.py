@@ -161,7 +161,7 @@ class YOLO(nn.Module):
             else:          
                 return display,loss
         else:
-            return  self.loss(outs,size=size,infer=True),feats
+            return  self.loss(outs,size=size,infer=True)
 class YOLO_SPP(YOLO):
     def __init__(self,cfg,loss):
         super(YOLO_SPP,self).__init__(cfg,loss)

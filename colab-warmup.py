@@ -16,7 +16,7 @@ def main(args,cfgs):
     #get data config
     for k in cfgs:
         curset = dataset(cfgs[k],mode='test')
-        loader = DataLoader(curset,batch_size=args.bs,shuffle=True,pin_memory=False,collate_fn=train_set.collate_fn)
+        loader = DataLoader(curset,batch_size=args.bs,shuffle=True,pin_memory=False,collate_fn=curset.collate_fn)
         for data in tqdm(loader):
             pass
 
