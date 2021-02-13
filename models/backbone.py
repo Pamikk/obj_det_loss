@@ -93,14 +93,14 @@ class BaseBlock(nn.Module):
         super(BaseBlock,self).__init__()
         self.conv1 = conv1x1(in_channels,channels,stride)
         self.relu = nn.LeakyReLU(0.1)
-        self.bn1 = nn.BatchNorm2d(channels)
+        self.bn1 = nn.BatchNorm2d(channels,momentum=0.9, eps=1e-5)
         self.conv2 = conv3x3(channels,channels*BaseBlock.multiple)
         if in_channels != channels*BaseBlock.multiple or stride!=1:
             self.downsample =  nn.Sequential(conv1x1(in_channels,channels*BaseBlock.multiple,stride),
-                                            nn.BatchNorm2d(channels*BaseBlock.multiple))
+                                            nn.BatchNorm2d(channels*BaseBlock.multiple,momentum=0.9, eps=1e-5))
         else:
             self.downsample = nn.Identity()
-        self.bn2 = nn.BatchNorm2d(channels*BaseBlock.multiple)
+        self.bn2 = nn.BatchNorm2d(channels*BaseBlock.multiple,momentum=0.9, eps=1e-5)
     def forward(self,x):
         y = self.conv1(x)
         y = self.bn1(y)
@@ -108,11 +108,12 @@ class BaseBlock(nn.Module):
 
         y = self.conv2(y)
         y = self.bn2(y)
+        y = self.relu(y)
 
         if self.downsample != None:
             x = self.downsample(x)
         y += x
-        y = self.relu(y)
+        
 
         return y
 class Darknet(nn.Module):
@@ -123,7 +124,7 @@ class Darknet(nn.Module):
         self.channels = [32,64,128,256,512]
         self.relu = nn.LeakyReLU(0.1)
         self.conv1 = conv3x3(3,32)
-        self.bn1 = nn.BatchNorm2d(32)
+        self.bn1 = nn.BatchNorm2d(32,momentum=0.9, eps=1e-5)
         self.in_channel = self.channels[0]
         encoders = []
         self.out_channels =[]
@@ -136,7 +137,7 @@ class Darknet(nn.Module):
         if downsample:
             out_channel = channel*2
             blocks.append(nn.Sequential(conv3x3(self.in_channel,out_channel,stride=2),
-                          nn.BatchNorm2d(out_channel),self.relu))
+                          nn.BatchNorm2d(out_channel,momentum=0.9, eps=1e-5),self.relu))
             self.in_channel = out_channel
         for _ in range(depth):
             blocks.append(block(self.in_channel,channel))
@@ -168,7 +169,16 @@ class Darknet(nn.Module):
             weights = np.fromfile(f, dtype=np.float32)  # The rest are weights
         ptr = 0
         stack = []
-        for m in self.modules():
+        cutoff = None
+        if "darknet53.conv.74" in self.path:
+            cutoff = 75
+        bnum =0
+        cnum = 0
+        bbnum = 0
+        num = 0
+        for i,m in enumerate(self.modules()):            
+            if i==cutoff:
+                 break
             if type(m) == nn.Conv2d:
                 if type(m.bias) == type(m.weight):
                     #exist bias
@@ -181,6 +191,8 @@ class Darknet(nn.Module):
                     conv_w = torch.from_numpy(weights[ptr : ptr + num_w]).view_as(m.weight)
                     m.weight.data.copy_(conv_w)
                     ptr += num_w
+                    cnum +=1
+                    bbnum+=1
                 else:
                     stack.append(m)
             if type(m) == nn.BatchNorm2d:
@@ -202,12 +214,17 @@ class Darknet(nn.Module):
                 m.running_var.data.copy_(bn_rv)
                 ptr += num_b
                 m = stack.pop(0)
+                bnum+=1
                 # Load conv. weights
                 num_w = m.weight.numel()
                 conv_w = torch.from_numpy(weights[ptr : ptr + num_w]).view_as(m.weight)
                 m.weight.data.copy_(conv_w)
                 ptr += num_w
+                cnum +=1 
                 assert len(stack)==0
+            else:
+                print(type(m))
+        print(cnum,bnum,bbnum,ptr)
         print("finish load from path:",self.path)
 
 class ResNet(nn.Module):

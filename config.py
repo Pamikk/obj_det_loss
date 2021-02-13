@@ -5,7 +5,7 @@ import json
 
 from stats import kmeans
 anchors = [[10,13],  [16,30],  [33,23],  [30,61],  [62,45],  [59,119],  [116,90],  [156,198],  [373,326]]
-dataset = 'VOC2012'
+dataset = 'VOC2007'
 path =f'data/annotation_{dataset}.json' #annotation path for anchor calculation
 def cal_anchors(sizes=None,num=9):
     #As in https://github.com/eriklindernoren/PyTorch-YOLOv3
@@ -52,22 +52,25 @@ class Config:
         self.anchors= anchors  
         self.anchor_divide=[(6,7,8),(3,4,5),(0,1,2)]
         self.anchor_num = len(self.anchors)
+        self.model_path = "models/yolov3.cfg"
         
         self.bs = 8       
         self.pre_trained_path = '../network_weights'
+        self.augment = False
         if mode=='train':
             self.file=f'./data/train_{dataset}.json'
             self.bs = 32 # batch size
             
             #augmentation parameter
+            self.augment = True
             self.flip = True
-            self.rot = 20
-            self.crop = 0.2
-            self.trans = 0.2
-            self.scale = 0.1
-            self.valid_scale = 0.25
+            self.rot = None # 20
+            self.crop = None #0.2
+            self.trans = None #.2
+            self.scale = None #0.1
+            self.valid_scale = None #0.25
             #train_setting
-            self.lr = 0.1
+            self.lr = 0.001
             self.weight_decay=5e-4
             self.momentum = 0.9
             #lr_scheduler
@@ -79,12 +82,12 @@ class Config:
             self.val_every_k_epoch = 10
             self.adjust_lr = False
             #loss hyp
-            self.obj_scale = 1
-            self.noobj_scale = 100
+            self.obj_scale = 2
+            self.noobj_scale = 10
             self.cls_scale = 1
             self.ignore_threshold = 0.5
             self.match_threshold = 0#regard as match above this threshold
-            self.base_epochs = [1,3]#base epochs with large learning rate,adjust lr_facter with 0.1
+            self.base_epochs = [-1]#base epochs with large learning rate,adjust lr_facter with 0.1
         elif mode=='val':
             self.file = f'./data/val_{dataset}.json'
         elif mode=='trainval':

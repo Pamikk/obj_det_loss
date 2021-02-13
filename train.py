@@ -30,18 +30,24 @@ def main(args,cfgs):
     config.exp_name = args.exp
     config.device = torch.device("cuda")
     torch.cuda.empty_cache()
+    #for reproducity
+    torch.manual_seed(2333)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
     #network
     if args.anchors:
         print('calculating new anchors')
         config.anchors,_ = cal_anchors(config.size)
     network = NetAPI(config,args.net,args.loss)
+    #network_ = NetAPI(config,'yoloo',args.loss)
     torch.cuda.empty_cache()
     det = Trainer(config,datasets,network,(args.resume,args.epochs))
     if args.mode=='val':
         #metrics = det.validate(det.start-1,mode='val')        
         #det.logger.write_metrics(det.start-1,metrics,[])
-        metrics = det.validate(det.start-1,mode='train')
-        det.logger.write_metrics(det.start-1,metrics,[],mode='Trainval')
+        metrics = det.validate(det.start-1,mode='train',save=True)
+        #det.logger.write_metrics(det.start-1,metrics,[],mode='Trainval')
     elif args.mode=='test':
         det.test()
     else:

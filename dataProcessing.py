@@ -130,7 +130,8 @@ class VOC_dataset(data.Dataset):
         self.annos = data
         self.mode = mode
         self.accm_batch = 0
-        self.size = random.choice(cfg.sizes)
+        self.size = cfg.size
+        self.aug = cfg.augment
     def __len__(self):
         return len(self.imgs)
 
@@ -176,17 +177,19 @@ class VOC_dataset(data.Dataset):
         img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
         h,w = img.shape[:2]        
         labels = self.gen_gts(anno)
+        #print(name)
         if self.mode=='train':
-            if (random.randint(0,1)==1) and self.cfg.flip:
-                img,labels = flip(img,labels)
-            if (random.randint(0,1)==1) and self.cfg.trans:
-                img,labels = translate(img,labels,self.cfg.trans)
-            if (random.randint(0,1)==1) and self.cfg.crop:
-                img,labels = crop(img,labels,self.cfg.crop)
-            if (random.randint(0,1)==1) and self.cfg.rot:
-                ang = random.uniform(-self.cfg.rot,self.cfg.rot)
-                scale = random.uniform(1-self.cfg.scale,1+self.cfg.scale)
-                img,labels = rotate(img,labels,ang,scale)
+            if self.aug:
+                if (random.randint(0,1)==1) and self.cfg.flip:
+                    img,labels = flip(img,labels)
+                if (random.randint(0,1)==1) and self.cfg.trans:
+                    img,labels = translate(img,labels,self.cfg.trans)
+                if (random.randint(0,1)==1) and self.cfg.crop:
+                    img,labels = crop(img,labels,self.cfg.crop)
+                if (random.randint(0,1)==1) and self.cfg.rot:
+                    ang = random.uniform(-self.cfg.rot,self.cfg.rot)
+                    scale = random.uniform(1-self.cfg.scale,1+self.cfg.scale)
+                    img,labels = rotate(img,labels,ang,scale)
             img,pad = self.pad_to_square(img)
             size = img.shape[0]
             labels[:,ls]+= pad[1]
@@ -216,7 +219,7 @@ class VOC_dataset(data.Dataset):
             data = torch.stack(data)
         elif self.mode=='train':
             data,labels = list(zip(*batch))
-            if self.accm_batch % 10 == 0:
+            if (self.accm_batch % 10 == 0)and (self.aug):
                 self.size = random.choice(self.cfg.sizes)
             tsize = (self.size,self.size)
             self.accm_batch += 1

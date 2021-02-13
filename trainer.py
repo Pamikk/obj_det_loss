@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 import os
 import json
+import random
 
 from utils import Logger,ap_per_class
 from utils import non_maximum_supression as nms
@@ -16,7 +17,7 @@ plot = [0.5,0.75]
 thresholds = np.around(np.arange(0.5,0.75,0.05),2)
 
 class Trainer:
-    def __init__(self,cfg,datasets,net,epoch):
+    def __init__(self,cfg,datasets,net,epoch,cmp_net=None):
         self.cfg = cfg
         if 'train' in datasets:
             self.trainset = datasets['train']
@@ -34,7 +35,7 @@ class Trainer:
         self.checkpoints = os.path.join(cfg.checkpoint,name)
 
         self.device = cfg.device
-        self.net = self.net
+        self.net_ = cmp_net
 
         self.optimizer = optim.Adam(self.net.parameters(),lr=cfg.lr,weight_decay=cfg.weight_decay)
         self.lr_sheudler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,mode='min', factor=cfg.lr_factor, threshold=0.0001,patience=cfg.patience,min_lr=cfg.min_lr)
@@ -82,6 +83,8 @@ class Trainer:
         else:
             self.start = 0
         self.net = self.net.to(self.device)
+        if not (cmp_net is None):
+            self.net_ = self.net_.to(self.device)
 
     def load_last_epoch(self):
         files = os.listdir(self.checkpoints)
@@ -169,7 +172,9 @@ class Trainer:
         for data in tqdm(self.trainset):
             inputs,labels = data
             labels = labels.to(self.device).float()
-            display,loss = self.net(inputs.to(self.device).float(),gts=labels)            
+            display,loss = self.net(inputs.to(self.device).float(),gts=labels)
+            #display,loss = self.net_(inputs.to(self.device).float(),gts=labels)
+            #exit()            
             del inputs,labels
             for k in running_loss:
                 if k in display.keys():
@@ -179,7 +184,7 @@ class Trainer:
             loss.backward()
             #solve gradient explosion problem caused by large learning rate or small batch size
             #nn.utils.clip_grad_value_(self.net.parameters(), clip_value=2.0) 
-            nn.utils.clip_grad_norm_(self.net.parameters(),max_norm=2.0)
+            #nn.utils.clip_grad_norm_(self.net.parameters(),max_norm=2.0)
             self.optimizer.step()
             self.optimizer.zero_grad()
             del loss
@@ -253,7 +258,7 @@ class Trainer:
                     if save:
                         pds_ = list(pred.cpu().numpy().astype(float))
                         pds_ = [list(pd) for pd in pds_]
-                        result = [pds_,pad]
+                        result 
                         res[name] = result
                     pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)
                     name = info['img_id'][b]
@@ -264,8 +269,9 @@ class Trainer:
                     pred_nms[:,0] -= pad[1]
                     pred_nms[:,1] -= pad[0]
                     pd_num+=pred_nms.shape[0]
-                    ##if pred_nms.shape[0]>0:
-                      ## print(pred_nms[0])
+                    if save:
+                        print(pred_nms)
+                        print(gt)
                     count+=1
                     for th in batch_metrics:
                         batch_metrics[th].append(cal_tp(pred_nms,gt,th))
@@ -307,6 +313,28 @@ class Trainer:
                     res[name] = pds_
         
         json.dump(res,open(os.path.join(self.predictions,'pred_test.json'),'w'))
+    def validate_random(self,mode):
+        self.net.eval()
+        if mode=='val':
+            valset = self.valset
+        else:
+            valset = self.trainval
+        length = len(valset)
+        idx = random.randint(length)
+        with torch.no_grad():
+            inputs,labels,info = valset.__getitem__(idx)
+            pds = self.net(inputs.to(self.device).float())           
+            pred = pds[b].view(-1,self.cfg.cls_num+5)
+            pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)
+            name = info['img_id'][b]
+            size = info['size'][b]
+            pad = info['pad'][b]
+            gt = labels[labels[:,0]==b,1:].reshape(-1,5)                   
+            pred_nms[:,:4] *= max(size)
+            pred_nms[:,0] -= pad[1]
+            pred_nms[:,1] -= pad[0]
+            pd_num+=pred_nms.shape[0]
+            count+=1
 
         
 

@@ -26,11 +26,11 @@ class YOLOLayer(nn.Module):
         self.anchors = anchors
         self.num_anchors = len(anchors)
         self.num_classes = cfg.cls_num
-        self.ignore_thres = 0.5
+        self.ignore_thres = cfg.ignore_threshold
         self.mse_loss = nn.MSELoss()
         self.bce_loss = nn.BCELoss()
-        self.obj_scale = 1
-        self.noobj_scale = 100
+        self.obj_scale = cfg.obj_scale
+        self.noobj_scale = cfg.noobj_scale
         self.img_dim = cfg.size
         self.grid_size = 0  # grid size
 
@@ -114,7 +114,7 @@ class YOLOLayer(nn.Module):
             total_loss = loss_x + loss_y + loss_w + loss_h + loss_conf + loss_cls
             res['wh']= loss_w.item() + loss_h.item()
             res['xy']= loss_x.item() + loss_y.item()
-            res['obj'] = loss_conf_obj.item()
+            res['obj'] = self.obj_scale *loss_conf_obj.item()
             res['conf'] = loss_conf.item()
             res['cls'] = loss_cls.item()
             res['all'] = total_loss.item()
@@ -182,32 +182,37 @@ class YOLOLoss(nn.Module):
 
         ious = torch.stack([iou_wo_center(gws,ghs,w,h) for (w,h) in self.scaled_anchors])
         vals, best_n = ious.max(0)
-        ind = torch.argsort(vals)
+        ind = torch.arange(vals.shape[0],device=self.device)
+        '''ind = torch.argsort(vals)
         # so that obj with bigger iou will cover the smaller one 
         # useful for crowed scenes
         idx = torch.argsort(gts[ind,-1],descending=True)#sort as match num,then gt has not matched will be matched first
         ind = ind[idx]
-        ind = ind[(vals[ind]>self.match_threshold)|(gts[ind,-1]==0)]
         #discard the gts below the match threshold and has been matched
-
-
         best_n =best_n[ind]
-        batch = gts[ind,0].long()
-        labels = gts[ind,1].long()
-        gxs,gys = gt_boxes[ind,0],gt_boxes[ind,1]
+        gts = gts[ind,:]
+        gt_boxes = gt_boxes[ind,:]
+        ious = ious[:,ind]
+        '''
+        
+        batch = gts[:,0].long()
+        labels = gts[:,1].long()
+        gxs,gys = gt_boxes[:,0],gt_boxes[:,1]
         gis,gjs = gxs.long(),gys.long()
         #calculate bbox ious with anchors      
         obj_mask[batch,best_n,gjs,gis] = 1
         noobj_mask[batch,best_n,gjs,gis] = 0
-        selected = torch.zeros_like(obj_mask,dtype=torch.long).fill_(-1)
-        
-        tbboxes[batch,best_n,gjs,gis] = gt_boxes[ind,:]
-        tcls[batch,best_n,gjs,gis,labels] = 1
-        selected[batch,best_n,gjs,gis] = ind
-        ious = ious.t()[ind]
+        ious = ious.t()
         #ignore big overlap but not the best
         for i,iou in enumerate(ious):
             noobj_mask[batch[i],iou > self.ignore_threshold,gjs[i],gis[i]] = 0
+
+        selected = torch.zeros_like(obj_mask,dtype=torch.long).fill_(-1)
+        
+        tbboxes[batch,best_n,gjs,gis] = gt_boxes
+        tcls[batch,best_n,gjs,gis,labels] = 1
+        selected[batch,best_n,gjs,gis] = ind
+        
 
         
         selected = torch.unique(selected[selected>=0])
@@ -358,10 +363,13 @@ class LossAPI(nn.Module):
     def __init__(self,cfg,loss):
         super(LossAPI,self).__init__()
         self.bbox_losses = cfg.anchor_divide.copy()
+        #self.bbox_losses_ = cfg.anchor_divide.copy()
         self.not_match = 0
         for i,ind in enumerate(cfg.anchor_divide):
             cfg.anchor_ind = ind
             self.bbox_losses[i] = Losses[loss](cfg)
+            #self.bbox_losses_[i] = Losses['yoloo'](cfg)
+
     def forward(self,outs,gt=None,size=None,infer=False):
         if infer:
             res = []
@@ -375,17 +383,22 @@ class LossAPI(nn.Module):
             match =torch.zeros((gt.shape[0],1),dtype=torch.float,device=gt.device)
             gt = torch.cat((gt,match),-1)
             for out,loss in zip(outs,self.bbox_losses): 
-               ret,total = loss(out,gt,size)
-               for k in ret:
-                   res[k] +=ret[k]
-               totals.append(total)
+                ret,total = loss(out,gt,size)
+                for k in ret:
+                    res[k] +=ret[k]
+                totals.append(total)
+                '''print(ret)    
+            print()
+            for out,loss in zip(outs,self.bbox_losses_): 
+                ret,total = loss(out,gt,size)
+                print(ret)'''
             not_match = int((gt[:,-1]==0).sum())
             if not_match>0:
                 self.not_match += not_match
             return res,torch.stack(totals).sum()
     def reset_notmatch(self):
         self.not_match = 0
-Losses = {'yolo':YOLOLayer,'yolo_iou':YOLOLoss_iou,'yolo_gou':YOLOLoss_gou,'yolo_com':YOLOLoss_com}
+Losses = {'yolo':YOLOLoss,'yoloo':YOLOLayer,'yolo_iou':YOLOLoss_iou,'yolo_gou':YOLOLoss_gou,'yolo_com':YOLOLoss_com}
 
 
 

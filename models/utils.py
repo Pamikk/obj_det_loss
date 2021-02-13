@@ -6,6 +6,14 @@ import os
 import json
 from tqdm import tqdm
 
+def init_weights(m):
+    if type(m) == torch.nn.Conv2d:
+        torch.nn.init.kaiming_normal_(m.weight.data)
+        #print(m)
+    elif type(m) == torch.nn.BatchNorm2d:
+        torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
+        torch.nn.init.constant_(m.bias.data, 0.0)
+        #print(m)
 def iou_wo_center(w1,h1,w2,h2):
     #assuming at the same center
     #return a vector nx1
@@ -132,6 +140,8 @@ def iou_wt_center(bbox1,bbox2):
     ious = inter/union
     ious[ious!=ious] = torch.tensor(0.0,device='cuda')
     return ious
+def to_cpu(tensor):
+    return tensor.detach().cpu()
 def build_targets(pred_boxes, pred_cls, target, anchors, ignore_thres):
 
     BoolTensor = torch.cuda.BoolTensor if pred_boxes.is_cuda else torch.BoolTensor
@@ -158,7 +168,7 @@ def build_targets(pred_boxes, pred_cls, target, anchors, ignore_thres):
     gwh = target_boxes[:, 2:]
     # Get anchors with best iou
     ious = torch.stack([iou_wo_center(w,h,gwh[:,0],gwh[:,1]) for (w,h) in anchors])
-    best_ious, best_n = ious.max(0)
+    _, best_n = ious.max(0)
     # Separate target values
     b, target_labels = target[:, :2].long().t()
     gx, gy = gxy.t()
