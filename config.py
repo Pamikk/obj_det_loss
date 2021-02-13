@@ -4,7 +4,8 @@ import random
 import json
 
 from stats import kmeans
-anchors = [[10,13],  [16,30],  [33,23],  [30,61],  [62,45],  [59,119],  [116,90],  [156,198],  [373,326]]
+
+anchors = [[32,48],  [72,71],  [83,126], [135,155],  [186,215],  [251,227],  [270,272],  [459,394],  [493,405]]
 dataset = 'VOC2007'
 path =f'data/annotation_{dataset}.json' #annotation path for anchor calculation
 def cal_anchors(sizes=None,num=9):
