@@ -261,7 +261,7 @@ class Trainer:
                     if save:
                         pds_ = list(pred.cpu().numpy().astype(float))
                         pds_ = [list(pd) for pd in pds_]
-                        result ={'pdbboxes':pds_,'pad':pad,'size':size}
+                        result ={'bboxes':pds_,'pad':pad,'size':size}
                         res[name] = result
                     pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)                    
                     gt = labels[labels[:,0]==b,1:].reshape(-1,5)                   
