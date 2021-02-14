@@ -53,7 +53,7 @@ class Config:
         self.anchors= anchors  
         self.anchor_divide=[(6,7,8),(3,4,5),(0,1,2)]
         self.anchor_num = len(self.anchors)
-        self.model_path = "models/yolov3.cfg"
+        self.model_path = "models/yolov3-spp.cfg"
         
         self.bs = 8       
         self.pre_trained_path = '../network_weights'

@@ -122,7 +122,7 @@ class YOLO(nn.Module):
                 ptr += num_w
                 cnum +=1 
                 assert len(stack)==0
-        print(cnum,bnum,bbnum,ptr)
+        print("Mine:",cnum,bnum,bbnum,ptr)
         print("finish load from path:",self.path)
     def make_prediction(self,out_channel,block,channel,upsample=True):
         if upsample:
@@ -166,18 +166,13 @@ class YOLO_SPP(YOLO):
     def __init__(self,cfg,loss):
         super(YOLO_SPP,self).__init__(cfg,loss)
         self.encoders = Darknet(os.path.join(cfg.pre_trained_path,'yolov3-spp.weights'))
-        self.path = os.path.join(cfg.pre_trained_path,'yolov3-spp.weights')
         self.out_channels = self.encoders.out_channels.copy()
         self.in_channel = self.out_channels.pop(0)
         self.relu = nn.LeakyReLU(0.1)
         decoders = []
         channels = [512,256,128]
-        channel = channels[0]
-        self.conv1 = nn.Sequential(NonResidual(self.in_channel,channel),
-                                   conv1x1(channel*NonResidual.multiple,channel),nn.BatchNorm2d(channel,momentum=0.9, eps=1e-5),self.relu)
         pool_size = [1,5,9,13]
         self.pools = nn.ModuleList([nn.MaxPool2d(kernel_size=ks,stride=1,padding=(ks-1) // 2) for ks in pool_size])
-        self.in_channel = channel * 4
         for i,ind in enumerate(cfg.anchor_divide):
             if i==0:
                 decoder = self.make_prediction_SPP(len(ind)*(cfg.cls_num+5),NonResidual,channels[i])
@@ -185,8 +180,11 @@ class YOLO_SPP(YOLO):
                 decoder = self.make_prediction(len(ind)*(cfg.cls_num+5),NonResidual,channels[i])
             decoders.append(decoder)
         self.decoders = nn.ModuleList(decoders)
+        self.path = os.path.join(cfg.pre_trained_path,'yolov3-spp.weights')
     def make_prediction_SPP(self,out_channel,block,channel):
-        upsample = nn.Identity()
+        upsample = nn.Sequential(NonResidual(self.in_channel,channel),
+                                   conv1x1(channel*NonResidual.multiple,channel),nn.BatchNorm2d(channel,momentum=0.9, eps=1e-5),self.relu)
+        self.in_channel = channel*4
         decoders=[block(self.in_channel,channel)]
         decoders.append(nn.Sequential(conv1x1(channel*block.multiple,channel),nn.BatchNorm2d(channel,momentum=0.9, eps=1e-5),self.relu))        
         pred = nn.Sequential(conv3x3(channel,channel*block.multiple),nn.BatchNorm2d(channel*block.multiple,momentum=0.9, eps=1e-5),self.relu,
@@ -200,12 +198,13 @@ class YOLO_SPP(YOLO):
         #spatial :[8,16,32,64,128] suppose inp is 256
         outs = []
         x = feats.pop(0)
-        x = self.conv1(x)
-        x = torch.cat([maxpool(x) for maxpool in self.pools],dim=1)
         y = []
-        for decoders in self.decoders:
+        for i,decoders in enumerate(self.decoders):
             up,decoder,pred = decoders
-            x = torch.cat([up(x)]+y,dim=1)
+            x = up(x)
+            if i==0:                
+                x = torch.cat([maxpool(x) for maxpool in self.pools],dim=1)
+            x = torch.cat([x]+y,dim=1)
             x = decoder(x)
             out = pred(x)
             outs.append(out)

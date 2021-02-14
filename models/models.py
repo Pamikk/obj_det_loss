@@ -110,6 +110,7 @@ class Darknetv3(nn.Module):
         self.seen = 0
         self.header_info = np.array([0, 0, 0, self.seen, 0], dtype=np.int32)
         self.cfg = cfg
+        self.spp = 'spp' in cfg.model_path
 
     def forward(self, x, gts=None):
         img_dim = x.shape[2:]
@@ -140,7 +141,10 @@ class Darknetv3(nn.Module):
     def initialization(self):
         for m in self.modules():
             init_weights(m)
-        self.load_darknet_weights(os.path.join(self.cfg.pre_trained_path,'yolov3.weights'))
+        if self.spp:
+            self.load_darknet_weights(os.path.join(self.cfg.pre_trained_path,'yolov3-spp.weights'))
+        else:
+            self.load_darknet_weights(os.path.join(self.cfg.pre_trained_path,'yolov3.weights'))
     def load_darknet_weights(self, weights_path):
         """Parses and loads the weights stored in 'weights_path'"""
      
