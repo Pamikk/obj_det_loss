@@ -166,6 +166,7 @@ class YOLO_SPP(YOLO):
     def __init__(self,cfg,loss):
         super(YOLO_SPP,self).__init__(cfg,loss)
         self.encoders = Darknet(os.path.join(cfg.pre_trained_path,'yolov3-spp.weights'))
+        self.path = os.path.join(cfg.pre_trained_path,'yolov3-spp.weights')
         self.out_channels = self.encoders.out_channels.copy()
         self.in_channel = self.out_channels.pop(0)
         self.relu = nn.LeakyReLU(0.1)
@@ -209,7 +210,6 @@ class YOLO_SPP(YOLO):
             out = pred(x)
             outs.append(out)
             y = [feats.pop(0)]
-        display,loss = self.loss(outs,*gts)
         if self.training:
             display,loss = self.loss(outs,gts,size)
             if optimizer!=None:
