@@ -68,7 +68,7 @@ class YOLOLayer(nn.Module):
         w = prediction[..., 2]  # Width
         h = prediction[..., 3]  # Height
         pred_conf = torch.sigmoid(prediction[..., 4])  # Conf
-        pred_cls = torch.sigmoid(prediction[..., 5:])  # Cls pred.
+        pred_cls = torch.softmax(prediction[..., 5:],dim=-1)  # Cls pred.
 
         # If grid size does not match current we compute new offsets
         if grid_size != self.grid_size:
@@ -339,6 +339,9 @@ class YOLOLoss_com(YOLOLoss):
         loss_x = mse_loss(xs[obj_mask],txs[obj_mask]-txs[obj_mask].floor())
         loss_y = mse_loss(ys[obj_mask],tys[obj_mask]-tys[obj_mask].floor())
         loss_xy = loss_x + loss_y
+
+        loss_w = mse_loss(ws[obj_mask],torch.log(tws[obj_mask]+1e-16))
+        loss_h = mse_loss(hs[obj_mask],torch.log(ths[obj_mask]+1e-16))
         loss_wh = loss_w + loss_h
         res['wh']=loss_wh.item()
         res['xy']=loss_xy.item()

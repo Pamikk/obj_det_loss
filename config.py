@@ -71,9 +71,9 @@ class Config:
         self.val_every_k_epoch = 10
         self.adjust_lr = False
         #loss hyp
-        self.obj_scale = 2
-        self.noobj_scale = 20
-        self.cls_scale = 1
+        self.obj_scale = 1.5
+        self.noobj_scale = 0.5
+        self.cls_scale = 5
         self.ignore_threshold = 0.5
         self.match_threshold = 0#regard as match above this threshold
         self.base_epochs = [-1]#base epochs with large learning rate,adjust lr_facter with 0.1
