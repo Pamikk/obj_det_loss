@@ -22,10 +22,12 @@ def main(args,cfgs):
     val_set = dataset(val_cfg,mode='val')
     trainval_set = dataset(trainval_cfg,mode='val')
     test_set = dataset(test_cfg,mode='test')
-    train_loader = DataLoader(train_set,batch_size=args.bs,shuffle=True,pin_memory=False,collate_fn=train_set.collate_fn)
-    val_loader = DataLoader(val_set,batch_size=val_cfg.bs,shuffle=False,pin_memory=False,collate_fn=val_set.collate_fn)
-    trainval_loader = DataLoader(trainval_set,batch_size=trainval_cfg.bs,shuffle=False,pin_memory=False,collate_fn=val_set.collate_fn)
-    test_loader = DataLoader(test_set,batch_size=test_cfg.bs,shuffle=False,pin_memory=False,collate_fn=test_set.collate_fn)
+    train_bs = config.bs if args.bs is None else args.bs
+    val_bs = val_cfg.bs if (args.bs is None) or (args.mode=='train') else args.bs   
+    train_loader = DataLoader(train_set,batch_size=train_bs,shuffle=True,pin_memory=False,collate_fn=train_set.collate_fn)
+    val_loader = DataLoader(val_set,batch_size=val_bs,shuffle=False,pin_memory=False,collate_fn=val_set.collate_fn)
+    trainval_loader = DataLoader(trainval_set,batch_size=val_bs,shuffle=False,pin_memory=False,collate_fn=val_set.collate_fn)
+    test_loader = DataLoader(test_set,batch_size=val_bs,shuffle=False,pin_memory=False,collate_fn=test_set.collate_fn)
     datasets = {'train':train_loader,'val':val_loader,'trainval':trainval_loader,'test':test_loader}
     config.exp_name = args.exp
     config.device = torch.device("cuda")
@@ -62,7 +64,7 @@ if __name__ == "__main__":
     parser.add_argument("--mode",type=str,default='train',help="only validation")
     parser.add_argument("--loss",type=str,default='yolo',help="loss type")
     parser.add_argument("--net",type=str,default='yolo',help="network type:yolo")
-    parser.add_argument("--bs",type=int,default=16,help="batchsize")
+    parser.add_argument("--bs",type=int,default=None,help="batchsize")
     parser.add_argument("--anchors",action='store_true')
     args = parser.parse_args()
     cfgs = {}

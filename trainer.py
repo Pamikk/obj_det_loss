@@ -21,6 +21,7 @@ class Trainer:
         self.cfg = cfg
         if 'train' in datasets:
             self.trainset = datasets['train']
+        if 'val' in datasets:
             self.valset = datasets['val']
         if 'trainval' in datasets:
             self.trainval = datasets['trainval']
@@ -65,7 +66,7 @@ class Trainer:
         self.bestMovingLossEpoch = 1e9
 
         self.early_stop_epochs = 50
-        self.alpha = 0.75 #for update moving loss
+        self.alpha = 0.95 #for update moving loss
         self.lr_change= cfg.adjust_lr
         self.base_epochs = cfg.base_epochs
 
@@ -137,7 +138,7 @@ class Trainer:
         if self.movingLoss ==0:
             self.movingLoss = loss
         else:
-            self.movingLoss = self.movingLoss * self.alpha + loss*(1-self.alpha)
+            self.movingLoss = self.movingLoss * (1-self.alpha) + loss*self.alpha
         if self.bestMovingLoss>self.movingLoss:
             self.bestMovingLoss = self.movingLoss
             self.bestMovingLossEpoch = epoch
@@ -313,28 +314,29 @@ class Trainer:
                     res[name] = pds_
         
         json.dump(res,open(os.path.join(self.predictions,'pred_test.json'),'w'))
-    def validate_random(self,mode):
+    def validate_random(self):
         self.net.eval()
-        if mode=='val':
-            valset = self.valset
-        else:
-            valset = self.trainval
-        length = len(valset)
-        idx = random.randint(length)
+        self.valset.shuffle = True
+        bs = self.valset.batch_size
+        imgs = list(range(bs))
+        preds = list(range(bs))
+        gts = list(range(bs))
+        sizes = list(range(bs))
         with torch.no_grad():
-            inputs,labels,info = valset.__getitem__(idx)
-            pds = self.net(inputs.to(self.device).float())           
-            pred = pds[b].view(-1,self.cfg.cls_num+5)
-            pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)
-            name = info['img_id'][b]
-            size = info['size'][b]
-            pad = info['pad'][b]
-            gt = labels[labels[:,0]==b,1:].reshape(-1,5)                   
-            pred_nms[:,:4] *= max(size)
-            pred_nms[:,0] -= pad[1]
-            pred_nms[:,1] -= pad[0]
-            pd_num+=pred_nms.shape[0]
-            count+=1
+            inputs,labels,info = next(iter(self.valset))
+            pds = self.net(inputs.to(self.device).float())
+            for b in range(bs):           
+                pred = pds[b].view(-1,self.cfg.cls_num+5)
+                pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)
+                size = info['size'][b]
+                pad = info['pad'][b]                  
+                pred_nms[:,:4] *= max(size)
+                pred_nms[:,0] -= pad[1]
+                pred_nms[:,1] -= pad[0]
+                imgs[b] = inputs[b]
+                preds[b] = pred_nms
+                gts[b] = labels[labels[:,0]==b,1:].reshape(-1,5) 
+        return imgs,preds,gts,sizes()
 
         
 

@@ -5,7 +5,7 @@ import torch
 from tqdm import tqdm
 import argparse
 
-from utils import non_maximum_supression_eval as nms
+from utils import non_maximum_supression as nms
 from utils import cal_tp_per_item,ap_per_class
 from config import Config
 def gen_gts(anno):
@@ -21,25 +21,29 @@ def gen_gts(anno):
     gts[:,4] = labels[:,4] -labels[:,2]
     return gts
 def main(args):
+    print(args.mode)
     cfg = Config(mode=args.mode)
     gts = json.load(open(cfg.file))
     nms_threshold = args.nms_threshold
     conf_threshold = args.conf_threshold
-    print(f"nms threshold:{nms_threshold}\n confidence threshold:{conf_threshold}")
+    print(f"nms threshold:{nms_threshold}\nconfidence threshold:{conf_threshold}")
     plot = [0.5,0.75] 
     thresholds = np.around(np.arange(0.5,0.75,0.05),2)
-    pds = json.load(open(os.path.join(cfg.checkpoint,args.exp,'pred',args.name)))
+    pds = json.load(open(os.path.join(cfg.checkpoint,args.exp,'pred',args.name+'.json')))
     mAP = 0
     batch_metrics={}
     for th in thresholds:
         batch_metrics[th] = []
     gt_labels = []
+    print(len(gts),len(pds))
     for img in tqdm(gts.keys()):
         res = pds[img]
         bboxes = torch.tensor(res['bboxes'])
         gt = gen_gts(gts[img])
         gt_labels += gt[:,0].tolist()  
         pred_nms = nms(bboxes,conf_threshold, nms_threshold)
+        print(len(pred_nms))
+        print(len(gt))
         for th in batch_metrics:
             batch_metrics[th].append(cal_tp_per_item(pred_nms,gt,th))
     metrics = {}
@@ -58,7 +62,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--exp",type=str,default='exp',help="name of exp")
     parser.add_argument("--mode",type=str,default='trainval',help="only validation")
-    parser.add_argument("--name",type=str,default='pred_test.json',help="name of prediction")
+    parser.add_argument("--name",type=str,default='pred_test',help="name of prediction")
     parser.add_argument("-n","--nms_threshold",type=float,default='0.5',help="nms threshod")
     parser.add_argument("-c","--conf_threshold",type=float,default='0.5',help="confidence threshod")
     args = parser.parse_args()

@@ -42,7 +42,7 @@ class YOLOLayer(nn.Module):
         # Calculate offsets for each grid
         self.grid_x = torch.arange(g).repeat(g, 1).view([1, 1, g, g]).type(FloatTensor)
         self.grid_y = torch.arange(g).repeat(g, 1).t().view([1, 1, g, g]).type(FloatTensor)
-        self.scaled_anchors = FloatTensor([(a_w / self.stride, a_h / self.stride) for a_w, a_h in self.anchors])
+        self.scaled_anchors = FloatTensor([(a_w , a_h) for a_w, a_h in self.anchors])
         self.anchor_w = self.scaled_anchors[:, 0:1].view((1, self.num_anchors, 1, 1))
         self.anchor_h = self.scaled_anchors[:, 1:2].view((1, self.num_anchors, 1, 1))
 
@@ -76,14 +76,14 @@ class YOLOLayer(nn.Module):
 
         # Add offset and scale with anchors
         pred_boxes = FloatTensor(prediction[..., :4].shape)
-        pred_boxes[..., 0] = x.data + self.grid_x
-        pred_boxes[..., 1] = y.data + self.grid_y
+        pred_boxes[..., 0] = (x.data + self.grid_x)/self.grid_size
+        pred_boxes[..., 1] = (y.data + self.grid_y)/self.grid_size
         pred_boxes[..., 2] = torch.exp(w.data) * self.anchor_w
         pred_boxes[..., 3] = torch.exp(h.data) * self.anchor_h
 
         output = torch.cat(
             (
-                pred_boxes.view(num_samples, -1, 4) /self.grid_size,
+                pred_boxes.view(num_samples, -1, 4),
                 pred_conf.view(num_samples, -1, 1),
                 pred_cls.view(num_samples, -1, self.num_classes),
             ),
@@ -232,7 +232,7 @@ class YOLOLoss(nn.Module):
         
 
         pd_bboxes = torch.zeros_like(pred[...,:4],dtype=torch.float,device=self.device)
-        pd_bboxes[...,0] = xs + grid_x
+        pd_bboxes[...,0] = (xs + grid_x)/
         pd_bboxes[...,1] = ys + grid_y
         pd_bboxes[...,2] = torch.exp(ws)*self.anchors_w
         pd_bboxes[...,3] = torch.exp(hs)*self.anchors_h
@@ -286,7 +286,7 @@ class YOLOLoss(nn.Module):
         self.stride = (size[0]/nh,size[1]/nw)
         pred = out.view(nb,self.num_anchors,self.cls_num+5,nh,nw).permute(0,1,3,4,2).contiguous()
         #reshape to nB,nA,nH,nW,bboxes
-        self.scaled_anchors = torch.tensor([(a_w / self.stride[1], a_h / self.stride[0]) for a_w, a_h in self.anchors],dtype=torch.float,device=self.device)
+        self.scaled_anchors = torch.tensor([(a_w, a_h) for a_w, a_h in self.anchors],dtype=torch.float,device=self.device)
         self.anchors_w = (self.scaled_anchors[:,0]).reshape((1, self.num_anchors, 1, 1))
         self.anchors_h = (self.scaled_anchors[:,1]).reshape((1, self.num_anchors, 1, 1))       
         

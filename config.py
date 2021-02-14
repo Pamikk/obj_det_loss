@@ -5,7 +5,7 @@ import json
 
 from stats import kmeans
 
-anchors = [[29.284, 37.17], [48.59, 68.512], [92.746, 104.106], [99.166, 117.154], [176.774, 170.019], [192.706, 195.867], [210.518, 217.084], [378.964, 328.491], [390.686, 335.793]]
+anchors = [[0.059, 0.074], [0.096, 0.136], [0.189, 0.205], [0.191, 0.244], [0.341, 0.343], [0.351, 0.379], [0.553, 0.534], [0.681, 0.617], [0.871, 0.691]]#[[29.284, 37.17], [48.59, 68.512], [92.746, 104.106], [99.166, 117.154], [176.774, 170.019], [192.706, 195.867], [210.518, 217.084], [378.964, 328.491], [390.686, 335.793]]
 dataset = 'VOC2007'
 path =f'data/annotation_{dataset}.json' #annotation path for anchor calculation
 def cal_anchors(sizes=None,num=9):
@@ -28,7 +28,7 @@ def cal_anchors(sizes=None,num=9):
                 scale = t
             else:
                 scale = sizes
-            allb.append((bw,bh))
+            allb.append((bw/t,bh/t))
     km = kmeans(allb,k=num,max_iters=1000)
     km.initialization()
     km.iter(0)
@@ -55,9 +55,28 @@ class Config:
         self.anchor_num = len(self.anchors)
         self.model_path = "models/yolov3.cfg"
         
-        self.bs = 1       
+        self.bs = 8       
         self.pre_trained_path = '../network_weights'
         self.augment = False
+        #train_setting
+        self.lr = 0.001
+        self.weight_decay=5e-4
+        self.momentum = 0.9
+        #lr_scheduler
+        self.min_lr = 5e-5
+        self.lr_factor = 0.25
+        self.patience = 12
+        #exp_setting
+        self.save_every_k_epoch = 15
+        self.val_every_k_epoch = 10
+        self.adjust_lr = False
+        #loss hyp
+        self.obj_scale = 2
+        self.noobj_scale = 20
+        self.cls_scale = 1
+        self.ignore_threshold = 0.5
+        self.match_threshold = 0#regard as match above this threshold
+        self.base_epochs = [-1]#base epochs with large learning rate,adjust lr_facter with 0.1
         if mode=='train':
             self.file=f'./data/train_{dataset}.json'
             self.bs = 32 # batch size
@@ -70,25 +89,7 @@ class Config:
             self.trans = None #.2
             self.scale = None #0.1
             self.valid_scale = None #0.25
-            #train_setting
-            self.lr = 0.001
-            self.weight_decay=5e-4
-            self.momentum = 0.9
-            #lr_scheduler
-            self.min_lr = 5e-5
-            self.lr_factor = 0.25
-            self.patience = 12
-            #exp_setting
-            self.save_every_k_epoch = 15
-            self.val_every_k_epoch = 10
-            self.adjust_lr = False
-            #loss hyp
-            self.obj_scale = 2
-            self.noobj_scale = 20
-            self.cls_scale = 1
-            self.ignore_threshold = 0.5
-            self.match_threshold = 0#regard as match above this threshold
-            self.base_epochs = [-1]#base epochs with large learning rate,adjust lr_facter with 0.1
+            
         elif mode=='val':
             self.file = f'./data/val_{dataset}.json'
         elif mode=='trainval':

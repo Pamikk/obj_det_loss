@@ -5,13 +5,26 @@ import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 import os 
 import json
+import cv2
 from tqdm import tqdm
+
 voc_classes= {'__background__':0, 'aeroplane':1, 'bicycle':2, 
           'bird':3, 'boat':4, 'bottle':5,'bus':6, 'car':7,
            'cat':8, 'chair':9,'cow':10, 'diningtable':11, 'dog':12,
             'horse':13,'motorbike':14, 'person':15, 'pottedplant':16,
             'sheep':17, 'sofa':18, 'train':19, 'tvmonitor':20}
 voc_indices = dict([(voc_classes[k]-1,k) for k in voc_classes])
+def draw_bboxes(img,bboxes,color,th=1):
+    img_ = img.copy()
+    for bbox in bboxes:
+        x,y,w,h = bbox
+        pt1 = (int(x-w/2),int(y-h/2))
+        pt2 = (int(x+w/2),int(y+h/2))
+        img_ =cv2.rectangle(img_,pt1,pt2,color,thickness = th)
+    return img_
+def tensor_to_img(src):
+    dst = np.transpose(src.cpu().numpy(),[1,2,0])
+    return dst
 class Logger(object):
     def __init__(self,log_dir):
         self.log_dir = log_dir
@@ -81,7 +94,7 @@ def iou_wt_center(bbox1,bbox2):
     area2 = bbox2[:,2]*bbox2[:,3]
     union = area1+area2 - inter
     ious = inter/union
-    ious[ious!=ious] = torch.tensor(0.0,device='cuda')
+    ious[ious!=ious] = torch.tensor(0.0,device=bbox1.device)
     return ious
 def iou_wt_center_np(bbox1,bbox2):
     #in numpy,only for evaluation,return a matrix m x n
@@ -371,25 +384,6 @@ def non_maximum_supression_soft(preds,conf_threshold=0.5,nms_threshold=0.4):
         keep.append(pd)
         dets[mask,4] *= (1-ious[mask])*(1-val)
         dets = dets[dets[:,4]>conf_threshold]
-    return torch.stack(keep).reshape(-1,7)
-def non_maximum_supression_eval(preds,conf_threshold=0.5,nms_threshold = 0.4):
-    preds = preds[preds[:,4]>conf_threshold]
-    if len(preds) == 0:
-        return preds      
-    score = preds[:,4]*preds[:,5]
-    idx = torch.argsort(score,descending=True)
-    dets = preds[idx]
-    keep = []
-    while len(dets)>0:
-        mask = dets[0,-1]==dets[:,-1]
-        new = dets[0]
-        keep.append(new)
-        ious = iou_wt_center(dets[0,:4],dets[:,:4])
-        if not(ious[0]>=0.7):
-            ious[0] = 1
-        mask = mask & (ious>nms_threshold)
-        #hard-nms        
-        dets = dets[~mask]
     return torch.stack(keep).reshape(-1,7)
 
 
