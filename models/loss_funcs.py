@@ -232,13 +232,13 @@ class YOLOLoss(nn.Module):
         
 
         pd_bboxes = torch.zeros_like(pred[...,:4],dtype=torch.float,device=self.device)
-        pd_bboxes[...,0] = (xs + grid_x)/
-        pd_bboxes[...,1] = ys + grid_y
+        pd_bboxes[...,0] = (xs + grid_x)/self.grid_size[1]
+        pd_bboxes[...,1] = ys + grid_y/self.grid_size[0]
         pd_bboxes[...,2] = torch.exp(ws)*self.anchors_w
         pd_bboxes[...,3] = torch.exp(hs)*self.anchors_h
         nb = pred.shape[0]       
         if infer:   
-            return torch.cat((pd_bboxes.view(nb,-1,4)/self.grid_size[0],conf.view(nb,-1,1),cls_score.view(nb,-1,self.cls_num)),dim=-1)
+            return torch.cat((pd_bboxes.view(nb,-1,4),conf.view(nb,-1,1),cls_score.view(nb,-1,self.cls_num)),dim=-1)
         else:
             pds_bbox = (xs,ys,ws,hs,pd_bboxes)
             obj_mask,noobj_mask,tbboxes,tcls,tconf = self.build_target(pd_bboxes,gts)
