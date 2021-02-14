@@ -48,7 +48,7 @@ class Config:
         self.multiscale = 3
         self.sizes = list(range(self.size-32*self.multiscale,self.size+32*self.multiscale+1,32)) 
         self.nms_threshold = 0.5
-        self.dc_threshold = 0.5
+        self.dc_threshold = 0.9
 
         self.anchors= anchors  
         self.anchor_divide=[(6,7,8),(3,4,5),(0,1,2)]

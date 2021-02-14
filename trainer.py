@@ -14,7 +14,7 @@ from utils import non_maximum_supression as nms
 from utils import cal_tp_per_item as cal_tp
 tosave = ['mAP']
 plot = [0.5,0.75] 
-thresholds = np.around(np.arange(0.5,0.75,0.05),2)
+thresholds = np.around(np.arange(0.5,0.76,0.05),2)
 
 class Trainer:
     def __init__(self,cfg,datasets,net,epoch,cmp_net=None):
@@ -62,7 +62,7 @@ class Trainer:
         self.best_mAP = 0
         self.best_mAP_epoch = 0
         self.movingLoss = 0
-        self.bestMovingLoss = 0
+        self.bestMovingLoss = 10000
         self.bestMovingLossEpoch = 1e9
 
         self.early_stop_epochs = 50
@@ -135,12 +135,8 @@ class Trainer:
             print('no such model at:',model_path)
             exit()
     def _updateRunningLoss(self,loss,epoch):
-        if self.movingLoss ==0:
-            self.movingLoss = loss
-        else:
-            self.movingLoss = self.movingLoss * (1-self.alpha) + loss*self.alpha
-        if self.bestMovingLoss>self.movingLoss:
-            self.bestMovingLoss = self.movingLoss
+        if self.bestMovingLoss<loss:
+            self.bestMovingLoss = loss
             self.bestMovingLossEpoch = epoch
             self.save_epoch('bestm',epoch)
     def logMemoryUsage(self, additionalString=""):
@@ -209,10 +205,9 @@ class Trainer:
             #step lr
             self._updateRunningLoss(running_loss['all'],epoch)
             if not self.warm_up(epoch):
-                self.lr_sheudler.step(self.movingLoss)
+                self.lr_sheudler.step(running_loss['all'])
             lr_ = self.optimizer.param_groups[0]['lr']
             if lr_ == self.cfg.min_lr:
-                print(lr_-self.cfg.min_lr)
                 stop_epochs +=1
             if (epoch+1)%self.save_every_k_epoch==0:
                 self.save_epoch(str(epoch),epoch)
@@ -223,12 +218,13 @@ class Trainer:
                 if mAP >= self.best_mAP:
                     self.best_mAP = mAP
                     self.best_mAP_epoch = epoch
+                    print("best so far, saving......")
                     self.save_epoch('best',epoch)
-                print(f"best so far with {self.best_mAP} at epoch:{self.best_mAP_epoch}")
                 if self.trainval:
                     metrics = self.validate(epoch,'train',self.save_pred)
                     self.logger.write_metrics(epoch,metrics,tosave,mode='Trainval')
                     mAP = metrics['mAP']
+            print(f"best so far with {self.best_mAP} at epoch:{self.best_mAP_epoch}")
             epoch +=1
                 
         print("Best mAP: {:.4f} at epoch {}".format(self.best_mAP, self.best_mAP_epoch))
@@ -268,7 +264,10 @@ class Trainer:
                         result ={'bboxes':pds_,'pad':pad,'size':size}
                         res[name] = result
                     pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)                    
-                    gt = labels[labels[:,0]==b,1:].reshape(-1,5)                 
+                    gt = labels[labels[:,0]==b,1:].reshape(-1,5)
+                    pred_nms_ = np.round(pred_nms.cpu().numpy().astype(np.float32),1)
+                    #print(pred_nms_)
+                    #print(gt)                 
                     pd_num+=pred_nms.shape[0]
                     '''if save:
                         print(pred_nms)
