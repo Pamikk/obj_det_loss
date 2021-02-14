@@ -258,16 +258,16 @@ class Trainer:
                     name = info['img_id'][b]
                     size = info['size'][b]
                     pad = info['pad'][b]
+                    pred[:,:4] *= max(size)
+                    pred[:,0] -= pad[1]
+                    pred[:,1] -= pad[0]
                     if save:
                         pds_ = list(pred.cpu().numpy().astype(float))
                         pds_ = [list(pd) for pd in pds_]
                         result ={'bboxes':pds_,'pad':pad,'size':size}
                         res[name] = result
                     pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)                    
-                    gt = labels[labels[:,0]==b,1:].reshape(-1,5)                   
-                    pred_nms[:,:4] *= max(size)
-                    pred_nms[:,0] -= pad[1]
-                    pred_nms[:,1] -= pad[0]
+                    gt = labels[labels[:,0]==b,1:].reshape(-1,5)                 
                     pd_num+=pred_nms.shape[0]
                     '''if save:
                         print(pred_nms)

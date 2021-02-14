@@ -3,6 +3,7 @@ import json
 import os
 import torch
 from tqdm import tqdm
+import argparse
 
 from utils import non_maximum_supression_eval as nms
 from utils import cal_tp_per_item,ap_per_class
@@ -19,54 +20,46 @@ def gen_gts(anno):
     gts[:,3] = labels[:,3] - labels[:,1]
     gts[:,4] = labels[:,4] -labels[:,2]
     return gts
-cfg = Config(mode='trainval')
-gts = json.load(open(cfg.file))
-nms_threshold = 0.5
-conf_threshold = 0
-tosave = ['mAP']
-plot = [0.5,0.75] 
-thresholds = np.around(np.arange(0.5,0.75,0.05),2)
-pds = json.load(open(os.path.join(cfg.checkpoint,'debug','pred','pred_test.json')))
-mAP = 0
-count = 0
-batch_metrics={}
-batch_metrics_={}
-for th in thresholds:
-    batch_metrics[th] = []
-    batch_metrics_[th] = []
-gt_labels = []
-for i,img in tqdm(enumerate(gts.keys())):
-    res = pds[img]
-    pdbboxes = torch.tensor(res['pdbboxes'])
-    pad = res['pad']
-    size = res['size']
-    gt = gen_gts(gts[img])
-    gt_labels += gt[:,0].tolist()  
-    pred_nms = nms(pred,conf_threshold, nms_threshold)
-    total = 0
+def main(args):
+    cfg = Config(mode=args.mode)
+    gts = json.load(open(cfg.file))
+    nms_threshold = args.nms_threshold
+    conf_threshold = args.conf_threshold
+    print(f"nms threshold:{nms_threshold}\n confidence threshold:{conf_threshold}")
+    plot = [0.5,0.75] 
+    thresholds = np.around(np.arange(0.5,0.75,0.05),2)
+    pds = json.load(open(os.path.join(cfg.checkpoint,args.exp,'pred',args.name)))
+    mAP = 0
+    batch_metrics={}
+    for th in thresholds:
+        batch_metrics[th] = []
+    gt_labels = []
+    for img in tqdm(gts.keys()):
+        res = pds[img]
+        bboxes = torch.tensor(res['bboxes'])
+        gt = gen_gts(gts[img])
+        gt_labels += gt[:,0].tolist()  
+        pred_nms = nms(bboxes,conf_threshold, nms_threshold)
+        for th in batch_metrics:
+            batch_metrics[th].append(cal_tp_per_item(pred_nms,gt,th))
+    metrics = {}
     for th in batch_metrics:
-        batch_metrics[th].append(cal_tp_per_item(pred_nms,gt,th))
-        batch_metrics[th].append(cal_tp_per_item(pred_nms,gt,th))
-metrics = {}
-for th in batch_metrics:
-    tps,scores,pd_labels = [np.concatenate(x, 0) for x in list(zip(*batch_metrics[th]))]
-    precision, recall, AP,_,_ = ap_per_class(tps, scores, pd_labels, gt_labels)
-    mAP += np.mean(AP)
-    if th in plot:
-        metrics['AP/'+str(th)] = np.mean(AP)
-        metrics['Precision/'+str(th)] = np.mean(precision)
-        metrics['Recall/'+str(th)] = np.mean(recall)
-metrics['mAP'] = mAP/len(thresholds)
-for k in metrics:
-    print(k,':',metrics[k])
-for th in batch_metrics_:
-    tps,scores,pd_labels = [np.concatenate(x, 0) for x in list(zip(*batch_metrics[th]))]
-    precision, recall, AP,_,_ = ap_per_class(tps, scores, pd_labels, gt_labels)
-    mAP += np.mean(AP)
-    if th in plot:
-        metrics['AP/'+str(th)] = np.mean(AP)
-        metrics['Precision/'+str(th)] = np.mean(precision)
-        metrics['Recall/'+str(th)] = np.mean(recall)
-metrics['mAP'] = mAP/len(thresholds)
-for k in metrics:
-    print(k,':',metrics[k])
+        tps,scores,pd_labels = [np.concatenate(x, 0) for x in list(zip(*batch_metrics[th]))]
+        precision, recall, AP,_,_ = ap_per_class(tps, scores, pd_labels, gt_labels)
+        mAP += np.mean(AP)
+        if th in plot:
+            metrics['AP/'+str(th)] = np.mean(AP)
+            metrics['Precision/'+str(th)] = np.mean(precision)
+            metrics['Recall/'+str(th)] = np.mean(recall)
+    metrics['mAP'] = mAP/len(thresholds)
+    for k in metrics:
+        print(k,':',metrics[k])
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--exp",type=str,default='exp',help="name of exp")
+    parser.add_argument("--mode",type=str,default='trainval',help="only validation")
+    parser.add_argument("--name",type=str,default='pred_test.json',help="name of prediction")
+    parser.add_argument("-n","--nms_threshold",type=float,default='0.5',help="nms threshod")
+    parser.add_argument("-c","--conf_threshold",type=float,default='0.5',help="confidence threshod")
+    args = parser.parse_args()
+    main(args)
