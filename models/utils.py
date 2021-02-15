@@ -9,11 +9,11 @@ from tqdm import tqdm
 def init_weights(m):
     if type(m) == torch.nn.Conv2d:
         torch.nn.init.kaiming_normal_(m.weight.data)
-        print(m)
+        #print(m)
     elif type(m) == torch.nn.BatchNorm2d:
         torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
         torch.nn.init.constant_(m.bias.data, 0.0)
-        print(m)
+        #print(m)
 def iou_wo_center(w1,h1,w2,h2):
     #assuming at the same center
     #return a vector nx1
