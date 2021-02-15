@@ -85,11 +85,11 @@ class Config:
             #augmentation parameter
             self.augment = True
             self.flip = True
-            self.rot = None # 20
-            self.crop = None #0.2
-            self.trans = None #.2
-            self.scale = None #0.1
-            self.valid_scale = None #0.25
+            self.rot = 20
+            self.crop = 0.2
+            self.trans = .2
+            self.scale = 0.1
+            self.valid_scale = 0.25
             
         elif mode=='val':
             self.file = f'./data/val_{dataset}.json'
