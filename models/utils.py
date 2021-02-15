@@ -59,8 +59,8 @@ def generalized_iou(bbox1,bbox2):
     union = area1+area2 - inter
     ious = inter/union
     gious = ious-(cover-union)/cover
-    ious[ious!=ious] = torch.tensor(0.0,device='cuda') #avoid nans
-    gious[gious!=gious] = torch.tensor(0.0,device='cuda') #avoid nans
+    ious[ious!=ious] = torch.tensor(0.0,device=bbox1.device) #avoid nans
+    gious[gious!=gious] = torch.tensor(0.0,device=bbox1.device) #avoid nans
     return ious,gious
 def cal_gious_matrix(bbox1,bbox2):
     #return mxn matrix

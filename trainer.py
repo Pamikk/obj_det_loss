@@ -163,7 +163,7 @@ class Trainer:
             return False
     def train_one_epoch(self):
         self.optimizer.zero_grad()
-        running_loss ={'xy':0.0,'wh':0.0,'conf':0.0,'cls':0.0,'obj':0.0,'all':0.0,'iou':0.0,'gou':0.0}
+        running_loss ={'xy':0.0,'wh':0.0,'conf':0.0,'cls':0.0,'obj':0.0,'all':0.0,'iou':0.0,'giou':0.0}
         self.net.train()
         n = len(self.trainset)
         for data in tqdm(self.trainset):
@@ -265,7 +265,7 @@ class Trainer:
                         res[name] = result
                     pred_nms = nms(pred,self.conf_threshold, self.nms_threshold)                    
                     gt = labels[labels[:,0]==b,1:].reshape(-1,5)
-                    pred_nms_ = np.round(pred_nms.cpu().numpy().astype(np.float32),1)
+                    #pred_nms_ = np.round(pred_nms.cpu().numpy().astype(np.float32),1)
                     #print(pred_nms_)
                     #print(gt)                 
                     pd_num+=pred_nms.shape[0]
@@ -334,8 +334,9 @@ class Trainer:
                 pred_nms[:,1] -= pad[0]
                 imgs[b] = inputs[b]
                 preds[b] = pred_nms
-                gts[b] = labels[labels[:,0]==b,1:].reshape(-1,5) 
-        return imgs,preds,gts,sizes()
+                gts[b] = labels[labels[:,0]==b,1:].reshape(-1,5)
+                sizes[b] = size 
+        return imgs,preds,gts,sizes
 
         
 

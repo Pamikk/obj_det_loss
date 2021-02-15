@@ -131,7 +131,7 @@ def iou_wt_center_np(bbox1,bbox2):
     ious[ious!=ious] = 0
     return ious
 
-def ap_per_class(tp, conf, pred_cls, target_cls):
+def ap_per_class(tp, conf, pred_cls, target_cls,plot=False):
     """ Compute the average precision, given the recall and precision curves.
     Source: https://github.com/rafaelpadilla/Object-Detection-Metrics.
     # Arguments
@@ -177,6 +177,8 @@ def ap_per_class(tp, conf, pred_cls, target_cls):
             p.append(precision_curve[-1])
 
             # AP from recall-precision curve
+            if plot:
+                plt.plot(recall_curve,precision_curve)
             ap.append(compute_ap(recall_curve, precision_curve))
 
     # Compute F1 score (harmonic mean of precision and recall)
@@ -198,7 +200,7 @@ def compute_ap(recall, precision):
     # correct AP calculation
     # first append sentinel values at the end
     mrec = np.concatenate(([0.0], recall, [1.0]))
-    mpre = np.concatenate(([0.0], precision, [0.0]))
+    mpre = np.concatenate(([1.0], precision, [0.0]))
 
     # compute the precision envelope
     for i in range(mpre.size - 1, 0, -1):

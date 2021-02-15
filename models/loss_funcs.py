@@ -323,15 +323,15 @@ class YOLOLoss_gou(YOLOLoss):
     def cal_bbox_loss(self,pds,tbboxes,obj_mask,res):
         pd_bboxes = pds[-1]
         if obj_mask.float().max()>0:#avoid no gt_objs
-            ious,gous = generalized_iou(pd_bboxes[obj_mask],tbboxes[obj_mask])
+            ious,gious = generalized_iou(pd_bboxes[obj_mask],tbboxes[obj_mask])
             loss_iou = 1 - ious.mean()
-            loss_gou = 1 - gous.mean()
+            loss_giou = 1 - gious.mean()
         else:
             loss_iou = torch.tensor(0.0,dtype=torch.float,device=self.device)
-            loss_gou = torch.tensor(0.0,dtype=torch.float,device=self.device)
+            loss_giou = torch.tensor(0.0,dtype=torch.float,device=self.device)
         res['iou'] = loss_iou.item()
-        res['gou'] = loss_gou.item()
-        return loss_gou,res
+        res['giou'] = loss_giou.item()
+        return loss_giou,res
 class YOLOLoss_com(YOLOLoss):
     def cal_bbox_loss(self,pds,tbboxes,obj_mask,res):
         xs,ys,ws,hs,pd_bboxes = pds
@@ -385,14 +385,14 @@ class LossAPI(nn.Module):
                 
             return torch.cat(res,dim=1)
         else:
-            res ={'xy':0.0,'wh':0.0,'conf':0.0,'cls':0.0,'obj':0.0,'all':0.0,'iou':0.0,'gou':0.0}
+            res ={'xy':0.0,'wh':0.0,'conf':0.0,'cls':0.0,'obj':0.0,'all':0.0,'iou':0.0,'giou':0.0}
             totals = []
             match =torch.zeros((gt.shape[0],1),dtype=torch.float,device=gt.device)
             gt = torch.cat((gt,match),-1)
             for out,loss in zip(outs,self.bbox_losses): 
                 ret,total = loss(out,gt,size)
                 for k in ret:
-                    res[k] +=ret[k]
+                    res[k] += ret[k]/len(self.bbox_losses)
                 totals.append(total)
                 '''print(ret)    
             print()

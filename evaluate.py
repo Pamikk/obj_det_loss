@@ -48,7 +48,7 @@ def main(args):
     metrics = {}
     for th in batch_metrics:
         tps,scores,pd_labels = [np.concatenate(x, 0) for x in list(zip(*batch_metrics[th]))]
-        precision, recall, AP,_,_ = ap_per_class(tps, scores, pd_labels, gt_labels)
+        precision, recall, AP,_,_ = ap_per_class(tps, scores, pd_labels, gt_labels,plot=True)
         mAP += np.mean(AP)
         if th in plot:
             metrics['AP/'+str(th)] = np.mean(AP)
