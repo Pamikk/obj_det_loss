@@ -273,9 +273,9 @@ class YOLOLoss(nn.Module):
     
     def cal_obj_loss(self,pds,target,obj_mask,res):
         noobj_mask,tconf = target
-        loss_conf_obj = self.object_scale*bce_loss(pds[obj_mask],tconf[obj_mask])
-        loss_conf_noobj = self.noobject_scale*bce_loss(pds[noobj_mask],tconf[noobj_mask])
-        loss_conf = loss_conf_noobj+loss_conf_obj
+        loss_conf_obj = bce_loss(pds[obj_mask],tconf[obj_mask])
+        loss_conf_noobj = bce_loss(pds[noobj_mask],tconf[noobj_mask])
+        loss_conf = self.noobject_scale*loss_conf_noobj+self.object_scale*loss_conf_obj
         res['obj'] = loss_conf_obj.item()
         res['conf'] = loss_conf.item()
         return loss_conf,res
@@ -297,7 +297,7 @@ class YOLOLoss(nn.Module):
             pds,obj_mask,tbboxes,tobj,tcls = self.get_pds_and_targets(pred,infer,gts)
         pds_bbox,pds_obj,pds_cls = pds
         loss_obj,res = self.cal_obj_loss(pds_obj,tobj,obj_mask,{})  
-        nm = obj_mask.float.sum()                   
+        nm = obj_mask.float().sum()                   
         if nm>0:
             loss_reg,res = self.cal_bbox_loss(pds_bbox,tbboxes,obj_mask,res)
             loss_cls,res = self.cal_cls_loss(pds_cls,tcls,obj_mask,res)
