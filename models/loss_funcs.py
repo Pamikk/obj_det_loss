@@ -296,11 +296,12 @@ class YOLOLoss(nn.Module):
         else:
             pds,obj_mask,tbboxes,tobj,tcls = self.get_pds_and_targets(pred,infer,gts)
         pds_bbox,pds_obj,pds_cls = pds
-        loss_obj,res = self.cal_obj_loss(pds_obj,tobj,obj_mask,{})                     
-        if obj_mask.float().max()==1:
+        loss_obj,res = self.cal_obj_loss(pds_obj,tobj,obj_mask,{})  
+        nm = obj_mask.float.sum()                   
+        if nm>0:
             loss_reg,res = self.cal_bbox_loss(pds_bbox,tbboxes,obj_mask,res)
             loss_cls,res = self.cal_cls_loss(pds_cls,tcls,obj_mask,res)
-            total = self.reg_scale*loss_reg+loss_obj+self.cls_scale*loss_cls
+            total = self.reg_scale*loss_reg+loss_obj+self.cls_scale*loss_cls*nm
         else:
             total = loss_obj
         res['all'] = total.item()

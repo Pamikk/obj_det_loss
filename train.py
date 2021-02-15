@@ -43,9 +43,9 @@ def main(args,cfgs):
         config.anchors,_ = cal_anchors(config.size)
         print(config.anchors)
     network = NetAPI(config,args.net,args.loss)
-    network_ = NetAPI(config,'yoloo',args.loss)
+    #network_ = NetAPI(config,'yoloo',args.loss)
     torch.cuda.empty_cache()
-    det = Trainer(config,datasets,network,(args.resume,args.epochs),network_)
+    det = Trainer(config,datasets,network,(args.resume,args.epochs))#,network_)
     if args.mode=='val':
         #metrics = det.validate(det.start-1,mode='val')        
         #det.logger.write_metrics(det.start-1,metrics,[])
