@@ -59,7 +59,7 @@ class Config:
         self.pre_trained_path = '../network_weights'
         self.augment = False
         #train_setting
-        self.lr = 0.001
+        self.lr = 0.01
         self.weight_decay=5e-4
         self.momentum = 0.9
         #lr_scheduler
@@ -74,9 +74,10 @@ class Config:
         self.obj_scale = 1.5
         self.noobj_scale = 0.5
         self.cls_scale = 5
+        self.reg_scale = 5
         self.ignore_threshold = 0.5
         self.match_threshold = 0#regard as match above this threshold
-        self.base_epochs = [-1]#base epochs with large learning rate,adjust lr_facter with 0.1
+        self.base_epochs = [1]#base epochs with large learning rate,adjust lr_facter with 0.1
         if mode=='train':
             self.file=f'./data/train_{dataset}.json'
             self.bs = 32 # batch size
