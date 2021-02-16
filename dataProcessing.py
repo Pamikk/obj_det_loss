@@ -179,17 +179,22 @@ class VOC_dataset(data.Dataset):
         labels = self.gen_gts(anno)
         #print(name)
         if self.mode=='train':
+            aug = []
             if self.aug:
                 if (random.randint(0,1)==1) and self.cfg.flip:
                     img,labels = flip(img,labels)
+                    aug.append('flip')
                 if (random.randint(0,1)==1) and self.cfg.trans:
                     img,labels = translate(img,labels,self.cfg.trans)
+                    aug.append('trans')
                 if (random.randint(0,1)==1) and self.cfg.crop:
                     img,labels = crop(img,labels,self.cfg.crop)
+                    aug.append('crop')
                 if (random.randint(0,1)==1) and self.cfg.rot:
                     ang = random.uniform(-self.cfg.rot,self.cfg.rot)
                     scale = random.uniform(1-self.cfg.scale,1+self.cfg.scale)
                     img,labels = rotate(img,labels,ang,scale)
+                    aug.append('rot')
             img,pad = self.pad_to_square(img)
             size = img.shape[0]
             labels[:,ls]+= pad[1]

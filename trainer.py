@@ -10,7 +10,7 @@ import json
 import random
 
 from utils import Logger,ap_per_class
-from utils import non_maximum_supression as nms
+from utils import non_maximum_supression_soft as nms
 from utils import cal_tp_per_item as cal_tp
 tosave = ['mAP']
 plot = [0.5,0.75] 

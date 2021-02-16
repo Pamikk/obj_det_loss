@@ -301,7 +301,7 @@ class YOLOLoss(nn.Module):
         if nm>0:
             loss_reg,res = self.cal_bbox_loss(pds_bbox,tbboxes,obj_mask,res)
             loss_cls,res = self.cal_cls_loss(pds_cls,tcls,obj_mask,res)
-            total = self.reg_scale*loss_reg+loss_obj+self.cls_scale*loss_cls*nm
+            total = nm*self.reg_scale*loss_reg+loss_obj+self.cls_scale*loss_cls*nm
         else:
             total = loss_obj
         res['all'] = total.item()
