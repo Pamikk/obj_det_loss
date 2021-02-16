@@ -372,7 +372,10 @@ def non_maximum_supression(preds,conf_threshold=0.5,nms_threshold = 0.4):
         mask = mask & (ious>nms_threshold)
         #hard-nms        
         dets = dets[~mask]
-    return torch.stack(keep).reshape(-1,7)
+    if len(keep)>0:
+        return torch.stack(keep).reshape(-1,7)
+    else:
+        return torch.tensor(keep).reshape(-1,7)
 def non_maximum_supression_soft(preds,conf_threshold=0.5,nms_threshold=0.4):
     keep = []
     cls_confs,cls_labels = torch.max(preds[:,5:],dim=1,keepdim=True)
@@ -380,7 +383,7 @@ def non_maximum_supression_soft(preds,conf_threshold=0.5,nms_threshold=0.4):
     dets = dets[dets[:,4]>conf_threshold]
     while len(dets)>0:
         _,idx = torch.max(dets[:,4]*dets[:,5],dim=0)
-        val = dets[:,4]
+        val = dets[idx,4]
         if val<=conf_threshold:
             continue        
         pd = dets[idx]
@@ -390,7 +393,10 @@ def non_maximum_supression_soft(preds,conf_threshold=0.5,nms_threshold=0.4):
         keep.append(pd)
         dets[mask,4] *= (1-ious[mask])*(1-val)
         dets = dets[dets[:,4]>conf_threshold]
-    return torch.stack(keep).reshape(-1,7)
+    if len(keep)>0:
+        return torch.stack(keep).reshape(-1,7)
+    else:
+        return torch.tensor(keep).reshape(-1,7)
 
 
 
