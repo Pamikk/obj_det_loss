@@ -228,7 +228,7 @@ class YOLOLoss(nn.Module):
         ws = pred[...,2]
         hs = pred[...,3]
         conf = torch.sigmoid(pred[...,4])#Object score
-        cls_score = torch.softmax(prediction[..., 5:],dim=-1) 
+        cls_score = torch.softmax(pred[..., 5:],dim=-1) 
         #grid,anchors
         
 

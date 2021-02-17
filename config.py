@@ -44,9 +44,9 @@ class Config:
         self.checkpoint='../checkpoints'
         self.cls_num = 20        
         self.res = 50
-        self.size = 416
+        self.size = 608
         self.multiscale = 3
-        self.sizes = list(range(self.size-32*self.multiscale,self.size+32*self.multiscale+1,32)) 
+        self.sizes = [608]#list(range(self.size-32*self.multiscale,self.size+32*self.multiscale+1,32)) 
         self.nms_threshold = 0.5
         self.dc_threshold = 0.95
 
